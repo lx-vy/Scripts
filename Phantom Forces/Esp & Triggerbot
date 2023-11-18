@@ -1,0 +1,486 @@
+local datamodel = game
+local worldroot = workspace
+
+local people = game:GetService("Players")
+local engine = game:GetService("RunService")
+local inputs = game:GetService("UserInputService")
+
+local new_vector2 = Vector2.new
+local new_vector3 = Vector3.new
+local new_cframe = CFrame.new
+
+local floor = math.floor
+local round = math.round
+
+local insert = table.insert
+local remove = table.remove
+
+local camera = worldroot.CurrentCamera
+local gravity = Vector3.new(0, -worldroot.Gravity, 0)
+
+local cache = {
+    connections = {rbx = {}, pf = {}},
+    instances = {},
+    drawings = {},
+}
+
+local function pf_connect(signal, func)
+    local _connection = signal:Connect(func)
+    local connection = {Connected = true}
+
+    function connection:Disconnect()
+        signal:Disconnect(func)
+    end
+    
+    insert(cache.connections.pf, connection)
+
+    return connection
+end
+
+local function rbx_connect(signal, func)
+    local connection = signal:Connect(func)
+
+    insert(cache.connections.rbx, connection)
+
+    return connection
+end
+
+local function new_instance(class, properties)
+    local instance = Instance.new(class)
+
+    for property, value in next, properties or {} do
+        instance[property] = value
+    end
+
+    insert(cache.instances, instance)
+
+    return instance
+end
+
+local function new_drawing(class, properties)
+    local drawing = Drawing.new(class)
+
+    for property, value in next, properties or {} do
+        drawing[property] = value
+    end
+
+    insert(cache.drawings, drawing)
+
+    return drawing
+end
+
+local floor_vector2, floor_vector3 do
+    function floor_vector2(vector)
+        return new_vector2(floor(vector.x), floor(vector.y))
+    end
+
+    function floor_vector3(vector)
+        return new_vector3(floor(vector.x), floor(vector.y), floor(vector.z))
+    end
+end
+
+local resolve_rootpart do
+    local to_orientation = new_cframe().toOrientation
+    local from_orientation = CFrame.fromOrientation
+
+    function resolve_rootpart(cframe)
+        local x, y, z = to_orientation(cframe)
+
+        return new_cframe(cframe.p) * from_orientation(0, y, 0)
+    end
+end
+
+local world_to_screen do
+    local world_to_viewport = camera.WorldToViewportPoint
+
+    function world_to_screen(world_position)
+        local screen_position, on_screen = world_to_viewport(camera, world_position)
+
+        screen_position = floor_vector3(screen_position)
+
+        return new_vector2(screen_position.x, screen_position.y), screen_position.z, on_screen
+    end
+end
+
+local get_bounding_box do
+    local tan, rad, max = math.tan, math.rad, math.max
+
+    function get_bounding_box(screen_position, depth)
+        local scale_factor = 1 / (depth * tan(rad(camera.FieldOfView / 2)) * 2) * 1000
+        local width, height = 4 * scale_factor, 6.5 * scale_factor
+
+        width *= camera.ViewportSize.X / 1920
+        height *= camera.ViewportSize.Y / 1080
+
+        local box_size = floor_vector2(new_vector2(max(width, 6), max(height, 10)))
+        local box_position = floor_vector2(new_vector2(screen_position.X - width / 2, screen_position.Y - height / 2))
+
+        return box_size, box_position
+    end
+end
+
+local interfaces, trajectory = {} do
+    local get = getrenv().shared.require
+
+    interfaces.network = get("network")
+    interfaces.physics = get("physics")
+
+    interfaces.events = get("PlayerStatusEvents")
+    interfaces.status = get("PlayerStatusInterface")
+
+    interfaces.character = get("CharacterInterface")
+    interfaces.spotting = get("HudSpottingInterface")
+    interfaces.weapon = get("WeaponControllerInterface")
+
+    interfaces.roundsystem = get("GameRoundInterface")
+    interfaces.replication = get("ReplicationInterface")
+    interfaces.gamesetting = get("PublicSettings")
+
+    for _, collection in next, getgc(true) do
+        local type = type(collection)
+
+        if type == "table" and rawget(collection, "gammo") then
+            interfaces.gamelogic = collection
+        end
+
+        if interfaces.gamelogic then
+            break
+        end
+    end
+end
+
+local events = getupvalue(interfaces.network.receive, 3)
+
+local raycast = {} do
+    local fpww = worldroot.FindPartOnRayWithWhitelist
+    local fpwi = worldroot.FindPartOnRayWithIgnoreList
+    local nwry = Ray.new
+
+    raycast.ignore = {partial = {worldroot.Map}, full = {worldroot.Ignore, worldroot.Map}}
+
+    function raycast:find_part_with_whitelist(origin, direction, ...)
+        return fpww(worldroot, nwry(origin, direction), ...)
+    end
+
+    function raycast:find_part_with_blacklist(origin, direction, ...)
+        return fpwi(worldroot, nwry(origin, direction), ...)
+    end
+
+    function raycast:find_part(part, origin, full)
+        origin = origin or camera.CFrame.p
+
+        local hit, position = self:find_part_with_whitelist(origin, part.Position - origin, full and self.ignore.full or self.ignore.partial)
+
+        if hit then
+            if hit.CanCollide and hit.Transparency == 0 then
+                return false
+            end 
+            
+            return self:find_part(part, position + (part.Position - origin).Unit * 0.01, full)
+        end
+
+        return true
+    end
+end
+
+local entities, equip, state = {} do
+    local function register(player)
+        local entry = interfaces.replication.getEntry(player)
+        local object = entry and entry:getThirdPersonObject()
+        local entity = {
+            weapon = object and object._weaponname or "unknown",
+            character = object and object:getCharacterHash(),
+            friendly = interfaces.status.isFriendly(player),
+            alive = interfaces.status.isPlayerAlive(player),
+
+            drawings = {
+                box = new_drawing("Square", {Color = Color3.new(1, 1, 1), Thickness = 1}),
+                bar = new_drawing("Line", {Color = Color3.new(0, 1, 0), Thickness = 1}),
+                name = new_drawing("Text", {Color = Color3.new(1, 1, 1), Text = tostring(player), Size = 13, Center = true, Font = 2}),
+                weap = new_drawing("Text", {Color = Color3.new(1, 1, 1), Size = 13, Center = true, Font = 2}),
+                dist = new_drawing("Text", {Color = Color3.new(1, 1, 1), Size = 13, Center = true, Font = 2}),
+                cham = new_instance("Highlight", {
+                    DepthMode = 1,
+                    FillColor = Color3.new(1, 0, 1), 
+                    OutlineColor = Color3.new(1, 0, 1), 
+                    FillTransparency = 0.5, 
+                    OutlineTransparency = 0.35,
+                    Parent = worldroot.Ignore
+                })
+            }
+        }
+
+        if entity.character then
+            entity.drawings.cham.Adornee = entity.character.torso.Parent
+        end
+
+        function entity:health()
+            return interfaces.status.getPlayerHealth(player)
+        end
+
+        function entity:hide()
+            for _, drawing in next, self.drawings do
+                if type(drawing) == "table" then
+                    if drawing.Visible then
+                        drawing.Visible = false
+                    end
+                elseif drawing.Enabled then
+                    drawing.Enabled = false
+                end
+            end
+        end
+
+        entities[player] = entity
+
+        return entity
+    end
+
+    for _, player in next, people:GetPlayers() do
+        register(player)
+    end
+
+    rbx_connect(people.PlayerAdded, function(player)
+        register(player)
+    end)
+
+    rbx_connect(people.PlayerRemoving, function(player)
+        local entity = assert(entities[player], "0x1")
+
+        entities[player] = nil
+
+        for name, drawing in next, entity.drawings do
+            if type(drawing) == "table" then
+                drawing:Remove()
+            else
+                drawing:Destroy()
+            end
+        end
+    end)
+
+    pf_connect(interfaces.events.onPlayerSpawned, function(player)
+        local entry = interfaces.replication.getEntry(player)
+        local object = entry and entry:getThirdPersonObject()
+        local entity = assert(entities[player], "0x2")
+
+        entity.character = object and object:getCharacterHash()
+        entity.drawings.cham.Adornee = entity.character and entity.character.torso.Parent
+        entity.friendly = interfaces.status.isFriendly(player)
+        entity.alive = true
+    end)
+
+    pf_connect(interfaces.events.onPlayerDied, function(player)
+        local entity = assert(entities[player], "0x3")
+
+        if entity then
+            entity.character = nil
+            entity.alive = false
+        end
+    end)
+
+    local function on_equip(player, ...)
+        local entity = entities[player]
+
+        equip(player, ...)
+
+        if entity then
+            local entry = interfaces.replication.getEntry(player)
+            local object = entry and entry:getThirdPersonObject()
+
+            if object then
+                entity.weapon = object._weaponname or "unknown"
+            end
+        else
+            warn("0x4")
+        end
+    end
+
+    equip = hookfunction(rawget(events, "equip"), function(...)
+        return on_equip(...)
+    end)
+
+    local function on_state(player, ...)
+        local entity = entities[player]
+
+        state(player, ...)
+
+        printconsole("state equip 0x1")
+
+        if entity then
+            local entry = interfaces.replication.getEntry(player)
+            local object = entry and entry:getThirdPersonObject()
+
+            if object then
+                printconsole("state equip 0x2")
+
+                entity.weapon = object._weaponname or "unknown"
+            end
+        else
+            warn("0x5")
+        end
+    end
+    
+    state = hookfunction(rawget(events, "state"), function(...)
+        return on_state(...)
+    end)
+end
+
+rbx_connect(engine.RenderStepped, function()
+    for player, entity in next, entities do
+        local friendly = entity.friendly
+        if friendly then entity:hide(); continue end
+
+        local character = entity.character
+        if not character then entity:hide(); continue end
+
+        local health = entity:health()
+        if not health or health <= 0 then entity:hide(); continue end
+
+        local screen_position, screen_depth, on_screen = world_to_screen(resolve_rootpart(character.torso.CFrame).p)
+        if not on_screen then entity:hide(); continue end 
+        
+        local drawings = entity.drawings
+        local box_size, box_position = get_bounding_box(screen_position, screen_depth)
+        local text_origin = new_vector2(box_size.X / 2 + box_position.X, box_size.Y + box_position.Y + 1)
+
+        local box_drawing = drawings.box do
+            box_drawing.Visible = on_screen
+            box_drawing.Position = box_position
+            box_drawing.Size = box_size
+        end
+
+        local bar_drawing = drawings.bar do
+            local health_scale = math.clamp(health / 100, 0, 1)
+            local health_origin = new_vector2(box_position.X - 2, box_position.Y + box_size.Y)
+
+            bar_drawing.Color = Color3.fromHSV(health_scale * 0.3, 1, 1)
+            bar_drawing.From = health_origin
+            bar_drawing.To = new_vector2(health_origin.X, health_origin.Y - health_scale * box_size.Y)
+            bar_drawing.Visible = on_screen
+        end
+
+        local name_drawing = drawings.name do
+            name_drawing.Position = new_vector2(box_size.X / 2 + box_position.X, box_position.Y - name_drawing.TextBounds.Y - 3)
+            name_drawing.Visible = on_screen
+        end
+
+        local weap_drawing = drawings.weap do
+            weap_drawing.Text = entity.weapon
+            weap_drawing.Position = text_origin
+            weap_drawing.Visible = on_screen
+        end
+
+        local dist_drawing = drawings.dist do
+            dist_drawing.Text = math.floor((camera.CFrame.p - character.torso.Position).magnitude) .. "s"
+            dist_drawing.Position = text_origin + new_vector2(0, 13)
+            dist_drawing.Visible = on_screen
+        end
+
+        local cham_drawing = drawings.cham do
+            cham_drawing.Enabled = on_screen
+        end
+    end
+end)
+
+local tb_tick = 0 do
+    rbx_connect(engine.Heartbeat, function()
+        local client = interfaces.character:getCharacterObject()
+        if not client then return end
+
+        local spring = client._zoommodspring
+        if not spring then return end
+
+        local controller = interfaces.weapon:getController()
+        if not controller then return end
+
+        local weapon = controller:getActiveWeapon()
+        if not weapon then return end
+    
+        local barrel = weapon._barrelPart
+        if not barrel then return end
+
+        for player, entity in next, entities do
+            local friendly = entity.friendly
+            if friendly then continue end
+
+            local character = entity.character
+            if not character or (character and not character.torso) then entity:hide(); continue end
+
+            local health = entity:health()
+            if not health or health <= 0 then continue end
+
+            local visible = false
+            local hipfire = (barrel.Position - character.torso.Position).magnitude < 6
+
+            local canfire = hipfire or weapon:isAiming()
+            if not canfire then continue end
+
+            local aiming_cur, aiming_max = spring.p, 90/100
+            if not hipfire and aiming_cur < aiming_max then continue end
+
+            for _, name in next, {"head", "torso"} do
+                local bone = character[name]
+                if not bone then continue end
+
+                visible = visible or raycast:find_part(bone)
+                if not visible then continue end
+
+                barrel = (aiming and weapon:getActiveAimStat("sightpart") or barrel)
+
+                local delta = (bone.Position - barrel.Position)
+                local direction = interfaces.physics.trajectory(barrel.Position, interfaces.gamesetting.bulletAcceleration, bone.Position, weapon:getWeaponStat("bulletspeed")).unit
+                local lookvector = barrel.CFrame.LookVector
+
+                local distance = delta.magnitude ^ -2.3
+                local threshold = 1 - distance
+
+                if lookvector.unit:Dot(direction) >= threshold then
+                    weapon:shoot(true)
+                end
+            end
+        end
+    end)
+end
+
+rbx_connect(engine.RenderStepped, function()
+    if interfaces.character.isAlive() then
+        interfaces.spotting.spot()
+    end
+end)
+
+rbx_connect(inputs.InputBegan, function(input)
+    if input.KeyCode == Enum.KeyCode.End then
+        for _, connections in next, cache.connections do
+            for index, connection in next, connections do
+                if connection.Connected then
+                    connection:Disconnect() 
+                end
+    
+                remove(cache.connections, index)
+            end
+        end
+
+        for index, instance in next, cache.instances do
+            if instance.Parent then
+                instance:Destroy()
+            end
+
+            remove(cache.instances, index)
+        end
+
+        for player, entity in next, entities do
+            entities[player] = nil
+            entity.character = nil
+
+            for _, drawing in next, entity.drawings do
+                if type(drawing) == "table" then
+                    drawing:Remove()
+                else
+                    drawing:Destroy()
+                end
+            end
+        end
+
+        hookfunction(rawget(events, "equip"), equip)
+        -- hookfunction(rawget(events, "state"), state)
+    end
+end)
