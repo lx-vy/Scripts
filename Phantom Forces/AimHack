@@ -1,0 +1,4305 @@
+-- common
+local workspace = game.Workspace
+local lighting = game.Lighting
+local fake_inputs = game.VirtualUser
+local players = game.Players
+local inputs = game:GetService("UserInputService")
+local loops = game.RunService
+local anim = game.TweenService
+local http = game.HttpService
+
+local client = {}
+local place = game.PlaceId
+local start_tick = tick()
+local env = getfenv()
+local fps = loops.Heartbeat
+local rig_type = (place == 3233893879 or place == 292439477) and (place == 3233893879 and "R17" or "R6") or tostring(game.StarterPlayer.GameSettingsAvatar):split(".")[3]
+
+local local_plr = players.LocalPlayer
+local local_cam = workspace.CurrentCamera
+
+local ideal_formats = {
+    Number = {inst = "NumberValue", prop = "Value"},
+    Color3 = {inst = "Color3Value", prop = "Value"},
+    Vector2 = {inst = "ParticleEmitter", prop = "SpreadAngle"}
+}
+
+local sounds = {
+    Skeet = "4753603610",
+    Neverloose = "6230626125",
+    Bameware = "3124331820"
+}
+
+local fonts = {
+    UI = 0,
+    System = 1,
+    Plex = 2,
+    Monospace = 3
+}
+
+local bones = {
+    R6 = {
+        "Head", "Torso",
+        "Left Arm", "Right Arm",
+        "Left Leg", "Right Leg"
+    },
+    R15 = {
+        "Head", "UpperTorso", "LowerTorso",
+        "LeftUpperArm", "LeftLowerArm", "LeftHand",
+        "RightUpperArm", "RightLowerArm", "RightHand",
+        "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
+        "RightUpperLeg", "RightLowerLeg", "RightFoot"
+    },
+    R17 = { -- Bad Business
+        "Head"
+    }
+}
+
+local bone_format = { -- for skelton esp
+    R6 = {
+        {From = "Head", To = "Neck"},
+        {From = "Neck", To = "Left Arm"},
+        {From = "Neck", To = "Right Arm"},
+        {From = "Neck", To = "Pelvis"},
+        {From = "Pelvis", To = "Left Leg"},
+        {From = "Pelvis", To = "Right Leg"}
+    },
+    R15 = {
+        {From = "Head", To = "UpperTorso"},
+        {From = "UpperTorso", To = "LowerTorso"},
+        {From = "UpperTorso", To = "RightUpperArm"},
+        {From = "UpperTorso", To = "LeftUpperArm"},
+        {From = "LeftUpperArm", To = "LeftLowerArm"},
+        {From = "RightUpperArm", To = "RightLowerArm"},
+        {From = "LowerTorso", To = "LeftUpperLeg"},
+        {From = "LeftUpperLeg", To = "LeftLowerLeg"},
+        {From = "LowerTorso", To = "RightUpperLeg"},
+        {From = "LeftLowerLeg", To = "LeftFoot"},
+        {From = "RightUpperLeg", To = "RightLowerLeg"},
+        {From = "RightLowerLeg", To = "RightFoot"}
+    },
+    R17 = {
+
+    }
+}
+
+local random_names = { -- for name spoof and other?
+    forename = {
+        -- male
+        "Joe", "John", "Jack", "Barry", "Chris", "Christopher",
+        "Michael", "David", "Thomas", "Paul", "Tony", "Mark",
+        "Cooper", "Jared", "James", "Jimmy", "Bob", "Robert",
+        "Riley", "William", "Will", "Donald", "George", "Ken",
+        "Steve", "Bruce", "Brian", "Chad", "Anthony", "Tim",
+        "Eddie", "Daniel", "Larry", "Jeff", "Justin", "Adam", 
+        "Ralph", "Brandon", "Xavier", "Greg", "Gordon", "Scott",
+        "Taine", "Howie", "Morgan", "Curtis", "Dwayne", "Steven", 
+        "Peter", "Kevin", "Coleman", "Garry",
+
+        -- female
+        "Kate", "Katie", "Jane", "Charlotte", "Olivia", "Chloe",
+        "Amelia", "Isabel", "Elise", "Sophie", "Scarlett", "Lily",
+        "Lucy", "Hannah", "Evelyn", "Willow", "Anna", "Sadie",
+        "Rose", "Summer", "Layla", "Camille", "Aylssa", "Madeline",
+        "Morgan", "Claire", "Daisy", "Alexis", "Victoria", "Paige",
+        "Bianca", "Rhiannon", "Hazel", "Mia", "Grace", "Ada", 
+        "Britney", "Alanna", "Fabienne", "Claudia", "Jacinta", "Jackie",
+        "Heather", "Margot",
+    },
+    surname = {
+        "Houston", "Burch", "Smith", "Jones", "Trump", "Sanders",
+        "Abbott", "Cruise", "Brown", "Davis", "Miller", "Wilson",
+        "Walker", "Lee", "Bryant", "Hall", "Adams", "Green",
+        "Turner", "Anderson", "Morris", "Howard", "Swanson",
+        "Peterson", "Powell", "Keating", "Rudd", "Coleman", "Cunningham",
+        "Donnell", "Callaghan", "Smithers", "Burns", "Bonds", "Gonzales", 
+        "Griffin", "Woods", "Gibson", "Webb", "Simpson", "Freeman",
+        "Mcdonald", "Butters", "Masterson", "Keefe", "Sanderson", "Badger",
+        "Williams", "Lopez", "Clark", "Campbell", "King", "Coleman",
+        "Chongs", "Riviera", "Ward", "Gray", "Ross"
+    }
+}
+
+local messages = {
+    kill = {
+        "%s Phantom forces is too hard for you m8 maybe consider a game that requires less skill, like idk.... solitaire",
+        "%s You're the human equivalent of a participation award", "%s Was that your spray on the wall or are you just happy to see me?",
+        "%s Did you know that phantom forces is free to uninstall?", "Even Noah can't carry these animals",
+        "%s How much did you tag that wall for??", "%s Who are you sponsored by? Parkinson's?", "%s Is your monitor on",
+        "%s idk if u know but it's mouse1 to shoot", "%s You have the reaction time of a dead puppy.",
+        "%s The only thing you carry is an extra chromosome.", "%s Safest place for us to stand is in front of your gun",
+        "mad cuz bad", "%s You can't even carry groceries in from the car", "%s Dude you're so fat you run out of breath rushing",
+        "%s You're almost as salty as the spunk dripping from your mum's mouth", "%s Rest in spaghetti never forgetti",
+        "%s Don't be upsetti, have some spaghetti", "%s Do you sell?", "%s What cheat?, Can i buy?", "%s 1'd ez", 
+        "%s You are obsolete!", "%s You die too easily!", "%s That had to hurt!", "%s Are you mad? Cause I'm not",
+        "%s How'd you hit the DEPLOY button with that aim?", "%s On a scale from 1 to 10, how old are you?", 
+        "%s Hey, you have something on your chin... No, the 3rd one down.", "%s I'd say uninstall but you'd probably miss that too",
+        "%s You define autism"
+    },
+    death = {
+        "%s You only killed me because I ran out of health",
+        "I PLAY WITH A RACING WHEEL",
+        "yea nice wallbang",
+        "my dog started barking",
+        "you teleported",
+        "nice ping advantage",
+        "i have low fps",
+        "teleported me back lol",
+        "i was typing looser",
+        "the sun was in my eyes",
+        "%s I hope u step on a Lego",
+        "%s I would slap you but that would be animal abuse",
+        "%s I'm not saying I hate you, but I'd unplug your life support to finish charging my phone.",
+        "%s Your family tree is a circle"
+    },
+    spam = {
+        "I MISS THE RAGE!? I MISS THE RAGE!? I MISS THE RAGE!? I MISS THE RAGE!?",
+        "WHAT CHEAT IS THAT!?",
+        "WANT THE BEST FREE PF CHEAT? CHECK OUT IT OUT @ url么zs.com/qGfk"
+    }
+}
+
+local function has(object, prop)
+    local has_prop = pcall(function()
+        return object[prop]
+    end)
+
+    return has_prop
+end
+
+local function type(object, name)
+    local roblox_type = typeof(object)
+
+    if(roblox_type == "table" and rawget(object, "__OBJECT")) then -- userdata
+        return "Drawing"
+    end
+    
+    return name and object.ClassName or roblox_type
+end
+
+local function wait(time)
+    if(time and time <= 0) then
+        return fps:Wait()
+    end
+
+    return env.wait(time)
+end
+
+local function create(class, props)
+    local instance = Instance.new(class)
+
+    for prop, val in next, props or {} do
+        instance[prop] = val
+    end
+
+    return instance
+end
+
+local function draw(class, props)
+    local drawing = Drawing.new(class)
+
+    for prop, val in next, props or {} do
+        drawing[prop] = val
+    end
+
+    return drawing
+end
+
+local function animate(object, options, to_change)
+    local obj_type = type(object)
+
+    if(obj_type == "Drawing") then
+        for prop, val in next, to_change do
+            local format = property_formats[type(val)]
+            local fake_instance = create(format.inst, {[format.prop] = obj[prop]})
+            local tween = anim:Create(object, TweenInfo.new(options.time), to_change)
+
+            local changed
+            changed = fake_instance:GetPropertyChangedSignal(format.prop):Connect(function()
+                object[prop] = fake_instance[format.prop]
+            end)
+    
+            local completed
+            completed = tween.Completed:Connect(function()
+                changed:Disconnect()
+                completed:Disconnect()
+                fake_instance:Destroy()
+            end)
+
+            tween:Play()
+        end
+
+        return
+    end
+
+    return anim:Create(object, TweenInfo.new(options.time), to_change):Play()
+end
+
+--[[local function getrawmetatable(object) -- fix for metatable detections (https://v3rmillion.net/showthread.php?tid=1124390)
+    local real_mt = env.getrawmetatable(object)
+    local fake_mt = hookmetamethod and setmetatable({}, {
+        __newindex = function(self, key, val)
+            hookmetamethod(object, key, newcclosure(val))
+        end,
+        __index = function(self, key)
+            return rawget(real_mt, key) -- hookmetamethod(object, key, rawget(real_mt, key))
+        end
+    }) or real_mt -- assuming the executer had its own fix
+
+    return fake_mt
+end]]
+
+-- security
+
+-- modules
+local json = {} do
+    function json:encode(tbl)
+        return http:JSONEncode(tbl)
+    end
+
+    function json:decode(str)
+        return http:JSONDecode(str)
+    end
+
+    function json:is_json(str)
+        return pcall(function()
+            http:JSONDecode(str)
+        end)
+    end
+end
+
+local menu = {flags = {}, tabs = {}, storage = {}} do -- menu module (old for now i cba to make new one yet)
+    --[[
+      > "documentation"
+    
+        local example_tab = menu:AddTab(Name <string>)
+        local example_section = menu:AddSection(Name <string>, Position <number>)
+
+        example_section:AddButton(Name <string>, Options <table>)
+
+        local example_toggle = example_section:AddToggle(Name <string>, Options <table>) do
+            example_toggle:AddColor(Option <table>)
+            example_toggle:AddBind(Option <table>)
+        end
+
+        example_section:AddList(Name <string>, Options <table>)
+
+        example_section:AddColor(Name <string>, Options <table>)
+
+        example_section:AddBind(Name <string>, Options <table>)
+
+        example_section:AddSlider(Name <string>, Options <table>)
+
+        example_section:AddLabel(Name <string>)
+
+
+        menu:Init(Name <string>, Build <string>)
+    ]]
+
+    -- common
+    local function class()
+        local Class = {}
+        Class.__index = Class
+    
+        function Class.new(...)
+            local classInst = setmetatable({}, Class)
+    
+            return classInst:__init(...) or classInst -- support for custom return value
+        end
+    
+        return Class
+    end
+
+    local function round(number, bracket)
+        bracket = bracket or 1
+
+        local result = math.floor(number / bracket + (math.sign(number) * 0.5)) * bracket
+        if result < 0 then
+            result = result + bracket
+        end
+    
+        return result
+    end
+
+    -- sub classes
+    local input = class() do
+        function input:__init(object, option)
+            self.name = name
+            self.type = "bind"
+            self.flag = option.flag or "nil"
+            self.pos = #object.subs
+            self.callback = option.callback
+            self.key = option.key and (type(option.key) == "string" and option.key or tostring(option.key):split(".")[3])
+            self.hold = option.hold
+            menu.flags[self.flag] = self.key
+            menu.flags[self.flag.."_held"] = false
+
+            table.insert(object.subs, self)
+        end
+
+        local blacklisted = {[Enum.KeyCode.Delete] = true}
+        local whitelisted = {[Enum.UserInputType.MouseButton1] = true, [Enum.UserInputType.MouseButton2] = true}
+        local aliases = {
+            ["RightShift"] = "RSHFT", 
+            ["LeftShift"] = "LSHFT", 
+            ["LeftControl"] = "LCRTL",  
+            ["RightControl"] = "RCRTL",
+            ["LeftAlt"] = "LALT",
+            ["RightAlt"] = "RALT",
+            ["CapsLock"] = "CAPS",
+        }
+
+        function input:Init(p1, p2)    
+            local touch = create("TextButton", {
+                Parent = p1,
+                AnchorPoint = Vector2.new(1, 0.5),
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                Position = UDim2.new(1, 0, 0.5, 0),
+                Size = UDim2.new(0, 200, 0, 20),
+                Font = Enum.Font.Gotham,
+                TextColor3 = Color3.fromRGB(210, 210, 210),
+                TextSize = 12.000,
+                TextTransparency = 0.2,
+                TextXAlignment = Enum.TextXAlignment.Right
+            })
+
+            local binding
+            local holding
+            local loop
+
+            function self:set(key)
+                binding = false
+                if loop then
+                    loop:Disconnect()
+                    loop = nil
+                end
+    
+                self.key = key and (type(key) == "string" and key or tostring(key):split(".")[3])
+                if self.key then
+                    menu.flags[self.flag] = self.key
+                    if self.key:match("Mouse") then
+                        touch.Text = ("[" .. ("M" .. self.key:sub(12, 13)) .. "]"):upper()
+                    else
+                        touch.Text = ("[" .. (aliases[self.key] or self.key) .. "]"):upper()
+                    end
+                else
+                    menu.flags[self.flag] = nil
+                    touch.Text = ("[-]"):upper()
+                end
+                
+                touch.Size = UDim2.new(0, touch.TextBounds.X + 4, 0, 20)
+            end
+
+            self:set(self.key)
+
+            ;(p2 or touch).MouseButton1Click:Connect(function()
+                binding = true
+                touch.Text = "..."
+            end)
+    
+            table.insert(menu.storage, inputs.InputBegan:Connect(function(i, gpe)
+                if inputs:GetFocusedTextBox() then return end
+                if (i.KeyCode.Name == self.key or i.UserInputType.Name == self.key) and(not binding) then
+                    if self.hold then
+                        loop = loops.Heartbeat:Connect(function()
+                            if binding then
+                                menu.flags[self.flag.."_held"] = false
+                                if self.callback then
+                                    self.callback(false)
+                                end
+
+                                loop:Disconnect()
+                                loop = nil
+                            else
+                                menu.flags[self.flag.."_held"] = true
+                                if self.callback then
+                                    self.callback(true)
+                                end
+                            end
+                        end)
+                    else
+                        if self.callback then
+                            self.callback(true)
+                        end
+                    end
+                elseif(binding) then
+                    local key
+                    if whitelisted[i.UserInputType] then
+                        key = i.UserInputType.Name or self.key
+                    elseif not blacklisted[i.KeyCode] and i.KeyCode ~= Enum.KeyCode.Backspace then
+                        key = i.KeyCode.Name or self.key
+                    end
+    
+                    self:set(key)
+                end
+            end))
+    
+            table.insert(menu.storage, inputs.InputEnded:Connect(function(i)
+                if i.KeyCode.Name == self.key or i.UserInputType.Name == self.key or i.UserInputType.Name == "MouseMovement" then
+                    if loop then
+                        menu.flags[self.flag.."_held"] = false
+                        if(self.callback) then
+                            self.callback(false)
+                        end
+
+                        loop:Disconnect()
+                        loop = nil
+                    end
+                end
+            end))
+        end
+    end
+
+    local picker = class() do
+        function picker:__init(object, option)
+            self.name = name
+            self.type = "color"
+            self.flag = option.flag or "nil"
+            self.pos = #object.subs
+            self.callback = option.callback
+            self.color = option.color or Color3.fromRGB(255, 255, 255)
+            self.alpha = option.alpha or nil
+            menu.flags[self.flag] = self.color
+            menu.flags[self.flag.."_alpha"] = self.alpha
+
+            table.insert(object.subs, self)
+        end
+
+        function picker:Init(p1, p2)    
+            local touch = create("ImageButton", {
+                Parent = p1,
+                AnchorPoint = Vector2.new(1, 0.5),
+                BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+                BorderColor3 = Color3.fromRGB(40, 40, 40),
+                Position = UDim2.new(1, 0, 0.5, 0),
+                Size = UDim2.new(0, 18, 0, 12),
+                AutoButtonColor = false,
+                ImageTransparency = 1
+            })
+            
+            local preview = create("Frame", {
+                Parent = touch,
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                BackgroundColor3 = Color3.fromRGB(52, 134, 235),
+                BorderColor3 = Color3.fromRGB(27, 42, 53),
+                BorderSizePixel = 0,
+                Position = UDim2.new(0.5, 0, 0.5, 0),
+                Size = UDim2.new(1, -2, 1, -2)
+            })
+            
+            local gradient = create("ImageLabel", {
+                Parent = preview,
+                BackgroundTransparency = 1.000,
+                Size = UDim2.new(1, 0, 1, 0),
+                Image = "rbxassetid://2454009026",
+                ImageColor3 = Color3.fromRGB(0, 0, 0),
+                ImageTransparency = 0.600
+            })
+
+
+            local picker = create("ImageButton", {
+                Parent = menu.inst,
+                ZIndex = 4,
+                AnchorPoint = Vector2.new(1, 0),
+                Visible = false,
+                BackgroundColor3 = Color3.fromRGB(60, 60, 70),
+                BorderColor3 = Color3.fromRGB(0, 0, 0),
+                Position = UDim2.new(0, 1000, 0, 100),
+                Size = UDim2.new(0, 195, 0, 240),
+                ImageTransparency = 1,
+                AutoButtonColor = false
+            })
+            
+            local back = create("Frame", {
+                ZIndex = 4,
+                Parent = picker,
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                BackgroundColor3 = Color3.fromRGB(32, 32, 33),
+                BorderSizePixel = 0,
+                Position = UDim2.new(0.5, 0, 0.5, 0),
+                Size = UDim2.new(1, -2, 1, -2)
+            })
+            
+            local dark = create("ImageButton", {
+                ZIndex = 4,
+                Parent = back,
+                BackgroundColor3 = Color3.fromRGB(255, 0, 0),
+                BorderColor3 = Color3.fromRGB(0, 0, 0),
+                ClipsDescendants = true,
+                Position = UDim2.new(0, 6, 0, 6),
+                Size = UDim2.new(0, 180, 0, 180),
+                Image = "rbxassetid://4155801252",
+                AutoButtonColor = false
+            })
+            
+            local darkRing = create("ImageLabel", {
+                ZIndex = 99,
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                Parent = dark,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                Size = UDim2.new(0, 8, 0, 8),
+                Image = "rbxassetid://3570695787",
+                ImageColor3 = Color3.fromRGB(0, 0, 0),
+                ScaleType = Enum.ScaleType.Slice,
+                SliceCenter = Rect.new(100, 100, 100, 100),
+                SliceScale = 0.040
+            })
+            
+            local darkRingIn = create("ImageLabel", {
+                ZIndex =99,
+                Parent = darkRing,
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                Position = UDim2.new(0.5, 0, 0.5, 0),
+                Size = UDim2.new(1, -4, 1, -4),
+                Image = "rbxassetid://3570695787",
+                ScaleType = Enum.ScaleType.Slice,
+                SliceCenter = Rect.new(100, 100, 100, 100),
+                SliceScale = 0.040
+            })
+            
+            local hue = create("ImageButton", {
+                ZIndex = 4,
+                Parent = back,
+                AnchorPoint = Vector2.new(0, 1),
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BorderColor3 = Color3.fromRGB(0, 0, 0),
+                Position = UDim2.new(0, 6, 0, 202),
+                Size = UDim2.new(1, -12, 0, 10),
+                ImageTransparency = 1,
+                AutoButtonColor = false
+            })
+            
+            local hueGradient = create("UIGradient", {
+                Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 0, 0)),
+                    ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 0, 255)),
+                    ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 0, 255)),
+                    ColorSequenceKeypoint.new(0.50, Color3.fromRGB(0, 255, 255)),
+                    ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 255, 0)),
+                    ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 255, 0)),
+                    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 0, 0))
+                }),
+                Rotation = 180,
+                Parent = hue
+            })
+            
+            local hueRing = create("Frame", {
+                ZIndex = 4,
+                Parent = hue,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BorderColor3 = Color3.fromRGB(0, 0, 0),
+                BorderSizePixel = 2,
+                Size = UDim2.new(0, 2, 1, 0)
+            })
+            
+            local box = create("TextButton", {
+                ZIndex = 4,
+                Parent = back,
+                BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+                BorderColor3 = Color3.fromRGB(40, 40, 40),
+                Position = UDim2.new(0, 6, 0, 210),
+                Size = UDim2.new(1, -12, 0, 20),
+                AutoButtonColor = false,
+                Font = Enum.Font.Gotham,
+                TextColor3 = Color3.fromRGB(210, 210, 210),
+                TextSize = 13.000
+            })
+            
+            local boxBack = create("Frame", {
+                ZIndex = 4,
+                Parent = box,
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+                BorderColor3 = Color3.fromRGB(27, 42, 53),
+                BorderSizePixel = 0,
+                Position = UDim2.new(0.5, 0, 0.5, 0),
+                Size = UDim2.new(1, -2, 1, -2)
+            })
+            
+            local value = create("TextBox", {
+                ZIndex = 4,
+                Parent = boxBack,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                Size = UDim2.new(1, 0, 1, 0),
+                ClearTextOnFocus = false,
+                Font = Enum.Font.Gotham,
+                Text = "255, 255, 255",
+                TextColor3 = Color3.fromRGB(210, 210, 210),
+                TextSize = 13.000
+            })
+
+            local alphaHue
+            local alphaRing
+
+            local r, g, b, a = self.color.r * 255, self.color.g * 255, self.color.b * 255, self.alpha
+            local h, s, v = Color3.toHSV(self.color)
+
+            local hueconnection
+            local darknessconnection
+            local alphaconnection
+
+            local function update(ignore)
+                anim:Create(hueRing, TweenInfo.new(0.12), {Position = UDim2.new(h, 0, 0, 0)}):Play()
+                anim:Create(darkRing, TweenInfo.new(0.12), {Position = UDim2.new(s, 0, 1 - v, 0)}):Play()
+
+                dark.BackgroundColor3 = Color3.fromHSV(h,1,1)
+                preview.BackgroundColor3 = Color3.fromHSV(h, s, v)
+                value.Text = tostring(table.concat({math.floor(r), math.floor(g), math.floor(b)}, ", "))
+
+                if(self.alpha) then
+                    anim:Create(alphaRing, TweenInfo.new(0.12), {Position = UDim2.new(0, 0, a, 0)}):Play()
+
+                    alphaHue.ImageColor3 = Color3.fromHSV(h,1,1)
+
+                    self.alpha = a
+                    menu.flags[self.flag.."_alpha"] = self.alpha
+                end
+
+                self.color = Color3.fromHSV(h, s, v)
+                menu.flags[self.flag] = self.color
+                if(not(ignore) and self.callback) then
+                    self.callback(self.color, self.alpha)
+                end
+            end
+
+            value.FocusLost:Connect(function()
+                local args = value.Text:split(",")
+
+                r, g, b = (tonumber(args[1]) or r), (tonumber(args[2]) or g), (tonumber(args[3]) or b)
+                h, s, v = Color3.toHSV(Color3.fromRGB(r, g, b))
+                update()
+            end)
+
+            hue.MouseButton1Down:Connect(function()
+                hueconnection = loops.Heartbeat:Connect(function()
+                    local mouse = inputs:GetMouseLocation() + Vector2.new(0, -36)
+                    local color = Color3.fromHSV(h,s,v)
+
+                    h = 1 - math.clamp(1 - ((mouse.X - hue.AbsolutePosition.X) / hue.AbsoluteSize.X), 0, 1)
+                    r, g, b = math.floor(color.r * 255), math.floor(color.g * 255), math.floor(color.b * 255)
+
+                    update()
+                end)
+            end)
+    
+            dark.MouseButton1Down:Connect(function()
+                darknessconnection = loops.Heartbeat:Connect(function()
+                    local mouse = inputs:GetMouseLocation() + Vector2.new(0, -36)
+                    local color = Color3.fromHSV(h,s,v)
+                    
+                    s = math.clamp((mouse.X - dark.AbsolutePosition.X) / dark.AbsoluteSize.X, 0, 1)
+                    v = 1 - math.clamp((mouse.Y - dark.AbsolutePosition.Y) / dark.AbsoluteSize.Y, 0, 1)
+                    r, g, b = math.floor(color.r * 255), math.floor(color.g * 255), math.floor(color.b * 255)
+
+                    update()
+                end)
+            end)
+
+            inputs.InputEnded:Connect(function(i)
+                if i.UserInputType == Enum.UserInputType.MouseButton1 then
+                    if hueconnection then
+                        hueconnection:Disconnect()
+                        hueconnection = nil
+                    end
+                    if darknessconnection then
+                        darknessconnection:Disconnect()
+                        darknessconnection = nil
+                    end
+                    if alphaconnection then
+                        alphaconnection:Disconnect()
+                        alphaconnection = nil
+                    end
+                end
+            end)
+
+            ;(p2 or touch).MouseButton1Click:Connect(function()
+                picker.Position = UDim2.new(0, preview.AbsolutePosition.X + touch.Size.X.Offset - 1, 0, preview.AbsolutePosition.Y + touch.Size.Y.Offset + 2)
+                picker.Visible = not picker.Visible
+            end)
+
+            if(self.alpha) then
+                picker.Size = UDim2.new(0, 210, 0, 240)
+    
+                local alpha = create("ImageButton", {
+                    ZIndex = 4,
+                    Parent = back,
+                    AnchorPoint = Vector2.new(1, 0),
+                    BorderColor3 = Color3.fromRGB(0, 0, 0),
+                    Position = UDim2.new(1, -6, 0, 6),
+                    Size = UDim2.new(0, 10, 0, 180),
+                    Image = "rbxassetid://4632082392",
+                    ScaleType = Enum.ScaleType.Tile,
+                    TileSize = UDim2.new(0, 5, 0, 5),
+                    AutoButtonColor = false
+                })
+                
+                alphaHue = create("ImageLabel", {
+                    ZIndex = 4,
+                    Parent = alpha,
+                    BackgroundTransparency = 1.000,
+                    Rotation = 180.000,
+                    Size = UDim2.new(1, 0, 1, 0),
+                    Image = "rbxassetid://2454009026",
+                    ImageColor3 = Color3.fromRGB(255, 0, 0)
+                })
+                
+                alphaRing = create("Frame", {
+                    ZIndex = 4,
+                    Parent = alphaHue,
+                    AnchorPoint = Vector2.new(0, 1),
+                    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                    BorderColor3 = Color3.fromRGB(0, 0, 0),
+                    BorderSizePixel = 2,
+                    Position = UDim2.new(0, 0, 1, 0),
+                    Size = UDim2.new(1, 0, 0, 2)
+                })
+    
+                alpha.MouseButton1Down:Connect(function()
+                    hueconnection = loops.Heartbeat:Connect(function()
+                        local mouse = inputs:GetMouseLocation() + Vector2.new(0, -36)
+
+                        a = math.clamp(1 - ((mouse.Y - alpha.AbsolutePosition.Y) / alpha.AbsoluteSize.Y), 0, 1)
+                        
+                        update()
+                    end)
+                end)
+            end
+            
+            update(true)
+        end
+    end
+
+    -- object classes
+    local button = class() do
+        function button:__init(section, name, option)
+            self.name = name
+            self.type = "button"
+            self.flag = option.flag or "nil"
+            self.pos = #section.objects
+            self.callback = option.callback
+            menu.flags[self.flag] = false
+
+            table.insert(section.objects, self)
+        end
+
+        function button:Init(p1)
+            local button = create("ImageButton", {
+                Parent = p1,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BorderColor3 = Color3.fromRGB(40, 40, 40),
+                LayoutOrder = self.pos,
+                Size = UDim2.new(1, 0, 0, 20),
+                Image = "rbxasset://textures/ui/GuiImagePlaceholder.png",
+                ImageTransparency = 1.000,
+                Active = false
+            })
+
+            local touch = create("TextButton", {
+                Parent = button,
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+                BorderColor3 = Color3.fromRGB(20, 20, 20),
+                Position = UDim2.new(0.5, 0, 0.5, 0),
+                Size = UDim2.new(1, -2, 1, -2),
+                AutoButtonColor = false,
+                Font = Enum.Font.Gotham,
+                Text = self.name,
+                TextColor3 = Color3.fromRGB(210, 210, 210),
+                TextSize = 13.000,
+                Active = false
+            })
+
+            function self:click()
+                coroutine.wrap(function()
+                    if(not menu) then return end
+                    menu.flags[self.flag] = true
+                    wait(0.1)
+                    if(not menu) then return end
+                    menu.flags[self.flag] = false
+                end)()
+
+                if self.callback then
+                    self.callback()
+                end
+            end
+
+            touch.MouseButton1Click:Connect(function()
+                self:click()
+            end)
+        end
+    end
+
+    local toggle = class() do
+        function toggle:__init(section, name, option)
+            self.subs = {}
+            self.name = name
+            self.type = "toggle"
+            self.flag = option.flag or "nil"
+            self.pos = #section.objects
+            self.callback = option.callback
+            self.state = option.state or false
+            menu.flags[self.flag] = self.state
+
+            table.insert(section.objects, self)
+        end
+
+        function toggle:AddColor(...)
+            return picker.new(self, ...)
+        end
+
+        function toggle:AddBind(...)
+            return input.new(self, ...)
+        end
+
+        function toggle:Init(p1)
+            local toggle = create("ImageButton", {
+                Parent = p1,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                BorderColor3 = Color3.fromRGB(40, 40, 40),
+                LayoutOrder = self.pos,
+                Size = UDim2.new(1, -4, 0, 18),
+                Image = "rbxasset://textures/ui/GuiImagePlaceholder.png",
+                ImageTransparency = 1.000,
+                ZIndex = #self.subs > 0 and 1 or 2,
+                Active = false
+            })
+
+            local touch = create("ImageButton", {
+                Parent = toggle,
+                AnchorPoint = Vector2.new(0, 0.5),
+                BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+                BorderColor3 = Color3.fromRGB(40, 40, 40),
+                Position = UDim2.new(0, -2, 0.5, 0),
+                Size = UDim2.new(0, 16, 0, 16),
+                AutoButtonColor = false,
+                ImageTransparency = 1,
+                Active = false
+            })
+
+            local dark = create("Frame", {
+                Parent = touch,
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+                BorderSizePixel = 0,
+                Position = UDim2.new(0.5, 0, 0.5, 0),
+                Size = UDim2.new(1, -2, 1, -2)
+            })
+
+            local accent = create("Frame", {
+                Parent = dark,
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                BackgroundColor3 = Color3.fromRGB(52, 134, 235),
+                BorderColor3 = Color3.fromRGB(27, 42, 53),
+                BorderSizePixel = 0,
+                Position = UDim2.new(0.5, 0, 0.5, 0),
+                Size = UDim2.new(1, 0, 1, 0),
+                BackgroundTransparency = self.state and 0 or 1
+            })
+
+            local gradient = create("ImageLabel", {
+                Parent = accent,
+                BackgroundTransparency = 1.000,
+                Size = UDim2.new(1, 0, 1, 0),
+                Image = "rbxassetid://2454009026",
+                ImageColor3 = Color3.fromRGB(0, 0, 0),
+                ImageTransparency = self.state and 0.6 or 1
+            })
+
+            local text = create("TextLabel", {
+                Parent = toggle,
+                AnchorPoint = Vector2.new(0, 0.5),
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                Position = UDim2.new(0, 20, 0.5, 0),
+                Size = UDim2.new(0, 200, 0, 20),
+                Font = Enum.Font.Gotham,
+                Text = self.name,
+                TextColor3 = Color3.fromRGB(210, 210, 210),
+                TextSize = 13.000,
+                TextXAlignment = Enum.TextXAlignment.Left
+            })
+            
+            local subs = create("Frame", {
+                Parent = toggle,
+                AnchorPoint = Vector2.new(1, 0),
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                Position = UDim2.new(1, 0, 0, 0),
+                Size = UDim2.new(0, 100, 1, 0)
+            })
+
+            local subLayout = create("UIListLayout", {
+                Parent = subs,
+                FillDirection = Enum.FillDirection.Horizontal,
+                HorizontalAlignment = Enum.HorizontalAlignment.Right,
+                SortOrder = Enum.SortOrder.LayoutOrder,
+                VerticalAlignment = Enum.VerticalAlignment.Center,
+                Padding = UDim.new(0, 6)
+            })
+
+            function self:toggle(state)
+                self.state = state or not self.state
+                menu.flags[self.flag] = self.state
+                anim:Create(accent, TweenInfo.new(0.12), {BackgroundTransparency = self.state and 0 or 1}):Play()
+                anim:Create(gradient, TweenInfo.new(0.12), {ImageTransparency = self.state and 0.6 or 1}):Play()
+
+                if self.callback then
+                    self.callback(self.state)
+                end
+            end
+
+            (#self.subs > 0 and touch or toggle).MouseButton1Click:Connect(function()
+                self:toggle()
+            end)
+
+            self.container = subs
+        end
+    end
+
+    local box = class() do
+        function box:__init(section, name, option)
+            self.name = name
+            self.type = "box"
+            self.flag = option.flag or "nil"
+            self.pos = #section.objects
+            self.callback = option.callback
+            self.text = option.text or ""
+            menu.flags[self.flag] = self.text
+
+            table.insert(section.objects, self)
+        end
+
+        function box:Init(p1)
+            local box = create("ImageButton", {
+                Parent = p1,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                BorderColor3 = Color3.fromRGB(40, 40, 40),
+                LayoutOrder = self.pos,
+                Size = UDim2.new(1, -4, 0, 42),
+                Image = "rbxasset://textures/ui/GuiImagePlaceholder.png",
+                ImageTransparency = 1.000,
+                Active = false
+            })
+
+            local touch = create("TextButton", {
+                Parent = box,
+                AnchorPoint = Vector2.new(0.5, 1),
+                BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+                BorderColor3 = Color3.fromRGB(40, 40, 40),
+                Position = UDim2.new(0.5, 0, 1, 0),
+                Size = UDim2.new(1, 4, 0, 20),
+                AutoButtonColor = false,
+                Font = Enum.Font.Gotham,
+                TextColor3 = Color3.fromRGB(210, 210, 210),
+                TextSize = 13.000,
+                Active = false
+            })
+            
+            local back = create("Frame", {
+                Parent = touch,
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+                BorderColor3 = Color3.fromRGB(27, 42, 53),
+                BorderSizePixel = 0,
+                Position = UDim2.new(0.5, 0, 0.5, 0),
+                Size = UDim2.new(1, -2, 1, -2)
+            })
+
+            local value = create("TextBox", {
+                Parent = back,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                Position = UDim2.new(0, 6, 0, 0),
+                Size = UDim2.new(1, -12, 1, 0),
+                ClearTextOnFocus = false,
+                Font = Enum.Font.Gotham,
+                Text = self.text,
+                TextColor3 = Color3.fromRGB(210, 210, 210),
+                TextSize = 13.000,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Active = false
+            })
+
+            local text = create("TextLabel", {
+                Parent = box,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                Position = UDim2.new(0, 1, 0, 0),
+                Size = UDim2.new(0, 200, 0, 20),
+                Font = Enum.Font.Gotham,
+                Text = self.name,
+                TextColor3 = Color3.fromRGB(210, 210, 210),
+                TextSize = 13.000,
+                TextXAlignment = Enum.TextXAlignment.Left
+            })
+
+            function self:set(text)
+                self.text = text or value.Text
+                value.Text = self.text
+                menu.flags[self.flag] = self.text
+
+                if(self.callback) then
+                    self.callback(self.text)
+                end
+            end
+
+            value.FocusLost:Connect(function()
+                self:set()
+            end)
+        end
+    end
+
+    local slider = class() do
+        function slider:__init(section, name, option)
+            self.name = name
+            self.type = "slider"
+            self.flag = option.flag or "nil"
+            self.pos = #section.objects
+            self.callback = option.callback
+            self.min = option.min or 0
+            self.max = option.max or 100
+            self.float = option.float or 1
+            self.value = round(math.clamp(option.value or self.min, self.min, self.max), self.float)
+            self.suffix = option.suffix or ""
+            menu.flags[self.flag] = self.value
+
+            table.insert(section.objects, self)
+        end
+
+        function slider:Init(p1)
+            local slider = create("ImageButton", {
+                Parent = p1,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                BorderColor3 = Color3.fromRGB(40, 40, 40),
+                LayoutOrder = self.pos,
+                Size = UDim2.new(1, -4, 0, 34),
+                Image = "rbxasset://textures/ui/GuiImagePlaceholder.png",
+                ImageTransparency = 1.000,
+                Active = false
+            })
+
+            local touch = create("ImageButton", {
+                Parent = slider,
+                AnchorPoint = Vector2.new(0.5, 1),
+                BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+                BorderColor3 = Color3.fromRGB(40, 40, 40),
+                Position = UDim2.new(0.5, 0, 1, 0),
+                Size = UDim2.new(1, 4, 0, 12),
+                AutoButtonColor = false,
+                ImageTransparency = 1,
+                Active = false
+            })
+
+            local back = create("Frame", {
+                Parent = touch,
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+                BorderColor3 = Color3.fromRGB(27, 42, 53),
+                BorderSizePixel = 0,
+                Position = UDim2.new(0.5, 0, 0.5, 0),
+                Size = UDim2.new(1, -2, 1, -2)
+            })
+
+            local text = create("TextLabel", {
+                Parent = slider,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                Position = UDim2.new(0, 1, 0, 0),
+                Size = UDim2.new(0, 200, 0, 20),
+                Font = Enum.Font.Gotham,
+                Text = self.name,
+                TextColor3 = Color3.fromRGB(210, 210, 210),
+                TextSize = 13.000,
+                TextXAlignment = Enum.TextXAlignment.Left
+            })
+
+            local value = create("TextBox", {
+                Parent = slider,
+                AnchorPoint = Vector2.new(1, 0),
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                Position = UDim2.new(1, 0, 0, 0),
+                Size = UDim2.new(0, 30, 0, 20),
+                Font = Enum.Font.Gotham,
+                Text = tostring(self.value, self.float) .. self.suffix,
+                TextColor3 = Color3.fromRGB(210, 210, 210),
+                TextSize = 13.000,
+                TextXAlignment = Enum.TextXAlignment.Right,
+                Active = false
+            })
+
+            local fill = create("Frame", {
+                Parent = back,
+                BackgroundColor3 = Color3.fromRGB(52, 134, 235),
+                BorderSizePixel = 0,
+                Size = UDim2.new((self.value - self.min) / (self.max - self.min), 0, 1, 0)
+            })
+
+            local gradient = create("ImageLabel", {
+                Parent = fill,
+                BackgroundTransparency = 1.000,
+                Size = UDim2.new(1, 0, 1, 0),
+                Image = "rbxassetid://2454009026",
+                ImageColor3 = Color3.fromRGB(0, 0, 0),
+                ImageTransparency = 0.600
+            })
+
+            function self:set(val)
+                self.value = round(val, self.float)
+                self.value = math.clamp(self.value, self.min, self.max)
+                menu.flags[self.flag] = self.value
+                value.Text = tostring(self.value) .. self.suffix
+
+                -- anim:Create(fill, TweenInfo.new(0.06), {Size = UDim2.new((self.value - self.min) / (self.max - self.min), 0, 1, 0)}):Play()
+                fill.Size = UDim2.new((self.value - self.min) / (self.max - self.min), 0, 1, 0)
+
+                if(self.callback) then
+                    self.callback(self.value)
+                end
+            end
+
+            local sliding = false do
+                touch.InputBegan:Connect(function(i)
+                    if(i.UserInputType == Enum.UserInputType.MouseButton1) then
+                        sliding = true
+                        self:set(self.min + ((i.Position.X - back.AbsolutePosition.X) / back.AbsoluteSize.X) * (self.max - self.min))
+                    end
+                end)
+
+                touch.InputEnded:Connect(function(i)
+                    if(i.UserInputType == Enum.UserInputType.MouseButton1) then
+                        sliding = false
+                    end
+                    if(i.UserInputType == Enum.UserInputType.MouseMovement) then
+                        value:ReleaseFocus()
+                    end
+                end)
+
+                table.insert(menu.storage, inputs.InputChanged:Connect(function(i)
+                    if(i.UserInputType == Enum.UserInputType.MouseMovement and sliding) then
+                        self:set(self.min + ((i.Position.X - back.AbsolutePosition.X) / back.AbsoluteSize.X) * (self.max - self.min))
+                    end
+                end))
+
+                value:GetPropertyChangedSignal("Text"):Connect(function()
+                    if(sliding) then return end
+                    if(not tonumber(value.Text)) then
+                        value.Text = value.Text:gsub("%D", "")
+                    else
+                        sliding = true
+                        self:set(value.Text)
+                        sliding = false
+                    end
+                end)
+            end
+        end
+    end
+
+    local label = class() do
+        function label:__init(section, name, option)
+            self.name = name
+            self.type = "label"
+            self.pos = #section.objects
+
+            table.insert(section.objects, self)
+        end
+
+        function label:Init(p1)
+            local label = create("ImageButton", {
+                Parent = p1,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                BorderColor3 = Color3.fromRGB(40, 40, 40),
+                LayoutOrder = self.pos,
+                Size = UDim2.new(1, -4, 0, 16),
+                Image = "rbxasset://textures/ui/GuiImagePlaceholder.png",
+                ImageTransparency = 1.000,
+                Active = false
+            })
+
+            local text = create("TextLabel", {
+                Parent = label,
+                AnchorPoint = Vector2.new(0, 0.5),
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                Position = UDim2.new(0, 1, 0.5, 0),
+                Size = UDim2.new(0, 200, 0, 20),
+                Font = Enum.Font.Gotham,
+                Text = self.name,
+                TextColor3 = Color3.fromRGB(210, 210, 210),
+                TextSize = 13.000,
+                TextXAlignment = Enum.TextXAlignment.Left
+            })
+
+            function self:set(t)
+                text.Text = t or text.Text
+            end
+        end
+    end
+
+    local list = class() do
+        function list:__init(section, name, option)
+            self.name = name
+            self.type = "list"
+            self.flag = option.flag or "nil"
+            self.pos = #section.objects
+            self.callback = option.callback
+            self.value = option.value or nil
+            self.values = (option.values and {unpack(option.values)}) or {}
+            self.multiselect = option.multiselect or (type(self.value) == "table" or false)
+            self.players = option.players or false -- eh
+            menu.flags[self.flag] = (self.value or (self.multiselect and {}))
+
+            table.insert(section.objects, self)
+        end
+
+        function list:Init(p1)
+            local list = create("ImageButton", {
+                Parent = p1,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                BorderColor3 = Color3.fromRGB(40, 40, 40),
+                LayoutOrder = self.pos,
+                Size = UDim2.new(1, -4, 0, 42),
+                Image = "rbxasset://textures/ui/GuiImagePlaceholder.png",
+                ImageTransparency = 1.000,
+                Active = false
+            })
+
+            local box = create("TextButton", {
+                Parent = list,
+                AnchorPoint = Vector2.new(0.5, 1),
+                BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+                BorderColor3 = Color3.fromRGB(40, 40, 40),
+                Position = UDim2.new(0.5, 0, 1, 0),
+                Size = UDim2.new(1, 4, 0, 20),
+                AutoButtonColor = false,
+                Font = Enum.Font.Gotham,
+                TextColor3 = Color3.fromRGB(210, 210, 210),
+                TextSize = 13.000,
+                Active = false
+            })
+            
+            local back = create("Frame", {
+                Parent = box,
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+                BorderColor3 = Color3.fromRGB(27, 42, 53),
+                BorderSizePixel = 0,
+                Position = UDim2.new(0.5, 0, 0.5, 0),
+                Size = UDim2.new(1, -2, 1, -2)
+            })
+            
+            local value = create("TextBox", {
+                Parent = back,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                Position = UDim2.new(0, 6, 0, 0),
+                Size = UDim2.new(1, -12, 1, 0),
+                ClearTextOnFocus = false,
+                Font = Enum.Font.Gotham,
+                Text = "Value",
+                TextColor3 = Color3.fromRGB(210, 210, 210),
+                TextSize = 13.000,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Active = false
+            })
+            
+            local touch = create("ImageButton", {
+                Parent = back,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                Size = UDim2.new(1, 0, 1, 0),
+                ZIndex = 2,
+                Image = "rbxasset://textures/ui/GuiImagePlaceholder.png",
+                ImageTransparency = 1.000,
+                Active = false
+            })
+            
+            local icon = create("ImageLabel", {
+                Parent = back,
+                AnchorPoint = Vector2.new(0, 0.5),
+                BackgroundTransparency = 1.000,
+                Position = UDim2.new(1, -16, 0.5, 0),
+                Rotation = 90.000,
+                Size = UDim2.new(0, 8, 0, 8),
+                Image = "rbxassetid://4918373417",
+                ImageTransparency = 0.400,
+                ScaleType = Enum.ScaleType.Fit
+            })
+            
+            local text = create("TextLabel", {
+                Parent = list,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                Position = UDim2.new(0, 1, 0, 0),
+                Size = UDim2.new(0, 200, 0, 20),
+                Font = Enum.Font.Gotham,
+                Text = self.name,
+                TextColor3 = Color3.fromRGB(210, 210, 210),
+                TextSize = 13.000,
+                TextXAlignment = Enum.TextXAlignment.Left
+            })
+
+
+            local drop = create("Frame", {
+                Parent = menu.inst,
+                Visible = false,
+                BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+                BorderColor3 = Color3.fromRGB(40, 40, 40),
+                Position = UDim2.new(0, 414, 0, 394),
+                Size = UDim2.new(0, 211, 0, 58)
+            })
+
+            local back = create("Frame", {
+                Parent = drop,
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+                BorderSizePixel = 0,
+                Position = UDim2.new(0.5, 0, 0.5, 0),
+                Size = UDim2.new(1, -2, 1, -2)
+            })
+            
+            local scroll = create("ScrollingFrame", {
+                Parent = back,
+                Active = true,
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                BorderSizePixel = 0,
+                Position = UDim2.new(0.5, 0, 0.5, 0),
+                Size = UDim2.new(1, -2, 1, -2),
+                ScrollBarThickness = 1,
+                ScrollBarImageColor3 = Color3.fromRGB(0, 0, 0)
+            })
+            
+            local scrollLayout = create("UIListLayout", {
+                Parent = scroll,
+                SortOrder = Enum.SortOrder.LayoutOrder
+            })
+            
+            local scrollPadding = create("UIPadding", {
+                Parent = scroll,
+                PaddingLeft = UDim.new(0, 4)
+            })
+
+            if(self.value) then
+                if(self.multiselect) then
+                    for _, value in next, self.value do
+                        if(not table.find(self.values, value)) then
+                            table.insert(self.values, value)
+                        end
+                    end
+
+                    value.Text = #self.value > 0 and table.concat(self.value, ", ") or "..."
+                else
+                    if(not table.find(self.values, self.value)) then
+                        table.insert(self.values, self.value)
+                    end
+
+                    value.Text = self.value
+                end
+            else
+                self.value = self.multiselect and {}
+                value.Text = "..."
+            end
+
+            for _, val in pairs(self.values) do
+                local button = create("TextButton", {
+                    Parent = scroll,
+                    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                    BackgroundTransparency = 1.000,
+                    LayoutOrder = #scroll:GetChildren(),
+                    Size = UDim2.new(0, 200, 0, 18),
+                    Font = Enum.Font.Gotham,
+                    Text = val,
+                    ZIndex = 4,
+                    TextColor3 = Color3.fromRGB(210, 210, 210),
+                    TextSize = 13,
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    TextTransparency = self.multiselect and (table.find(self.value, val) and 0 or 0.5) or (val == self.value and 0 or 0.5)
+                })
+
+                button.MouseButton1Click:Connect(function()
+                    if(self.multiselect) then
+                        local state = table.find(self.value, val)
+
+                        if state then
+                            table.remove(self.value, state)
+                        else
+                            table.insert(self.value, val)
+                        end
+
+                        button.TextTransparency = state and 0.5 or 0
+                        value.Text = #self.value > 0 and table.concat(self.value, ", ") or "..."
+                        menu.flags[self.flag] = self.value -- eh
+                    else
+                        for _, btn in next, scroll:GetChildren() do
+                            if(btn:IsA("TextButton")) then
+                                btn.TextTransparency = btn == button and 0 or 0.5
+                            end
+                        end
+
+                        self.value = val
+                        value.Text = self.value
+                        menu.flags[self.flag] = self.value
+                    end
+
+                    if(self.callback) then
+                        self.callback(self.value)
+                    end
+                end)
+            end
+
+            scrollLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+                drop.Size = UDim2.new(0, 211, 0, math.clamp(scrollLayout.AbsoluteContentSize.Y + 4, 0, 58))
+                scroll.CanvasSize = UDim2.new(0, 0, 0, scrollLayout.AbsoluteContentSize.Y)
+            end)
+
+            touch.MouseButton1Click:Connect(function()
+                drop.Position = UDim2.new(0, box.AbsolutePosition.X, 0, box.AbsolutePosition.Y + 22)
+                drop.Visible = not drop.Visible
+            end)
+        end
+    end
+
+    local bind = class() do
+        function bind:__init(section, name, option)
+            self.subs = {}
+            self.pos = #section.objects
+            self.name = name
+            self.type = "bind"
+            self.name = name
+
+            table.insert(section.objects, self)
+            return input.new(self, option)
+        end
+
+        function bind:Init(p1)
+            local bind = create("ImageButton", {
+                Parent = p1,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                BorderColor3 = Color3.fromRGB(40, 40, 40),
+                LayoutOrder = self.pos,
+                Size = UDim2.new(1, -4, 0, 16),
+                ImageTransparency = 1.000,
+                ZIndex = 2
+            })
+
+            local text = create("TextLabel", {
+                Parent = bind,
+                AnchorPoint = Vector2.new(0, 0.5),
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                Position = UDim2.new(0, 0, 0.5, 0),
+                Size = UDim2.new(0, 200, 0, 20),
+                Font = Enum.Font.Gotham,
+                Text = self.name,
+                TextColor3 = Color3.fromRGB(210, 210, 210),
+                TextSize = 13.000,
+                TextXAlignment = Enum.TextXAlignment.Left
+            })
+
+            self.button = bind
+            self.container = bind
+        end
+    end
+
+    local color = class() do
+        function color:__init(section, name, option)
+            self.subs = {}
+            self.pos = #section.objects
+            self.name = name
+            self.type = "color"
+            self.name = name
+
+            table.insert(section.objects, self)
+            return picker.new(self, option)
+        end
+
+        function color:Init(p1)
+            local color = create("ImageButton", {
+                Parent = p1,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                BorderColor3 = Color3.fromRGB(40, 40, 40),
+                LayoutOrder = self.pos,
+                Size = UDim2.new(1, -4, 0, 16),
+                ImageTransparency = 1.000,
+                ZIndex = 2
+            })
+
+            local text = create("TextLabel", {
+                Parent = color,
+                AnchorPoint = Vector2.new(0, 0.5),
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                Position = UDim2.new(0, 0, 0.5, 0),
+                Size = UDim2.new(0, 200, 0, 20),
+                Font = Enum.Font.Gotham,
+                Text = self.name,
+                TextColor3 = Color3.fromRGB(210, 210, 210),
+                TextSize = 13.000,
+                TextXAlignment = Enum.TextXAlignment.Left
+            })
+
+            self.button = color
+            self.container = color
+        end
+    end
+
+    local section = class() do
+        function section:__init(tab, name, pos)
+            self.name = name
+            self.pos = pos
+            self.objects = {}
+            table.insert(tab.sections, self)
+        end
+
+        function section:AddButton(...)
+            return button.new(self, ...)
+        end
+
+        function section:AddToggle(...)
+            return toggle.new(self, ...)
+        end
+
+        function section:AddBox(...)
+            return box.new(self, ...)
+        end
+
+        function section:AddSlider(...)
+            return slider.new(self, ...)
+        end
+
+        function section:AddList(...)
+            return list.new(self, ...)
+        end
+
+        function section:AddLabel(...)
+            return label.new(self, ...)
+        end
+
+        function section:AddBind(...)
+            return bind.new(self, ...)
+        end
+
+        function section:AddColor(...)
+            return color.new(self, ...)
+        end
+
+        function section:Init(p1)
+            local section = create("Frame", {
+                Parent = p1,
+                BackgroundColor3 = Color3.fromRGB(32, 32, 33),
+                BorderColor3 = Color3.fromRGB(60, 60, 70),
+                Position = UDim2.new(-0.0259740259, 0, 0.00659133727, 0),
+                Size = UDim2.new(1, 0, 0, 400)
+            })
+
+            local sectionAccent = create("Frame", {
+                Parent = section,
+                AnchorPoint = Vector2.new(0.5, 0),
+                BackgroundColor3 = Color3.fromRGB(52, 134, 235),
+                BorderColor3 = Color3.fromRGB(27, 42, 53),
+                BorderSizePixel = 0,
+                Position = UDim2.new(0.5, 0, 0, -1),
+                Size = UDim2.new(1, 2, 0, 1)
+            })
+
+            local container = create("Frame", {
+                Parent = section,
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                Position = UDim2.new(0.5, 0, 0.5, 0),
+                Size = UDim2.new(1, -20, 1, -26)
+            })
+
+            local sectionLayout = create("UIListLayout", {
+                Parent = container,
+                HorizontalAlignment = Enum.HorizontalAlignment.Center,
+                SortOrder = Enum.SortOrder.LayoutOrder,
+                Padding = UDim.new(0, 6)
+            })
+
+            local text = create("TextLabel", {
+                Parent = section,
+                AnchorPoint = Vector2.new(0, 0.5),
+                BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+                BorderSizePixel = 0,
+                Position = UDim2.new(0, 12, 0, 0),
+                Size = UDim2.new(0, 100, 0, 3),
+                Font = Enum.Font.Gotham,
+                Text = self.name,
+                TextColor3 = Color3.fromRGB(255, 255, 255),
+                TextSize = 13.000,
+                TextTransparency = 0.100
+            })
+
+            text.Size = UDim2.new(0, text.TextBounds.X + 4, 0, 3)
+            sectionLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+                section.Size = UDim2.new(1, 0, 0, sectionLayout.AbsoluteContentSize.Y + 24)
+            end)
+
+            self.container = container
+        end
+    end
+
+    local tab = class() do
+        function tab:__init(name)
+            self.name = name
+            self.pos = #menu.tabs + 1 
+            self.sections = {}
+            table.insert(menu.tabs, self)
+        end
+
+        function tab:AddSection(...)
+            return section.new(self, ...)
+        end
+
+        function tab:Show() -- igh look away 
+            if(self.inst.Visible) then return end
+            for _, tab in next, menu.tabs do
+                local children = tab.btn:GetChildren()
+                children[1].Visible = false
+                children[2].Visible = false
+                children[3].Visible = false
+                tab.inst.Visible = false
+                tab.btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                tab.btn.BackgroundColor3 = Color3.fromRGB(32, 32, 33)
+            end
+
+            local children = self.btn:GetChildren()
+            children[1].Visible = self.pos > 1
+            children[2].Visible = self.pos < #menu.tabs      
+            children[3].Visible = true
+            children[3].Position = self.pos == 1 and UDim2.new(0, 0, 1, 1) or UDim2.new(0, 1, 1, 1)
+            children[3].Size = (self.pos == 1 or self.pos == #menu.tabs) and UDim2.new(1, -1, 0, 1) or UDim2.new(1, -2, 0, 1)
+            self.inst.Visible = true
+            self.btn.TextColor3 = Color3.fromRGB(52, 134, 235)
+            self.btn.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+        end
+
+        function tab:Init(p1, p2)
+            local btn = create("TextButton", {
+                Parent = p1,
+                BackgroundColor3 = Color3.fromRGB(32, 32, 33),
+                BorderSizePixel = 0,
+                LayoutOrder = #menu.tabs + 1,
+                Size = UDim2.new(0, 0, 1, 0),
+                AutoButtonColor = false,
+                Font = Enum.Font.Gotham,
+                Text = self.name,
+                TextColor3 = Color3.fromRGB(255, 255, 255),
+                TextSize = 13.000,
+                TextTransparency = 0.100,
+                Active = false
+            })
+
+            local left = create("Frame", {
+                Parent = btn,
+                BackgroundColor3 = Color3.fromRGB(60, 60, 70),
+                BorderSizePixel = 0,
+                Position = UDim2.new(0, 0, 0, -2),
+                Size = UDim2.new(0, 1, 1, 2),
+                Visible = false
+            })
+
+            local right = create("Frame", {
+                Parent = btn,
+                AnchorPoint = Vector2.new(1, 0),
+                BackgroundColor3 = Color3.fromRGB(60, 60, 70),
+                BorderSizePixel = 0,
+                Position = UDim2.new(1, 0, 0, -2),
+                Size = UDim2.new(0, 1, 1, 2),
+                Visible = false
+            })
+
+            local bottom = create("Frame", {
+                Parent = btn,
+                AnchorPoint = Vector2.new(0, 1),
+                BackgroundColor3 = Color3.fromRGB(24, 24, 24),
+                BorderSizePixel = 0,
+                Position = UDim2.new(0, 0, 1, 1),
+                Size = UDim2.new(1, -1, 0, 1),
+                Visible = false
+            })
+
+            local padding = create("UIPadding", {
+                Parent = btn,
+                PaddingTop = UDim.new(0, 2)
+            })
+
+            local tab = create("ScrollingFrame", {
+                Parent = p2,
+                Visible = false,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                BorderSizePixel = 0,
+                Size = UDim2.new(1, 0, 1, 0),
+                ScrollBarThickness = 0,
+                CanvasSize = UDim2.new(0,0,2,0)
+            })
+
+            local left = create("Frame", {
+                Parent = tab,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                Position = UDim2.new(0, 12, 0, 12),
+                Size = UDim2.new(0.5, -18, 1, -24)
+            })
+
+            local leftLayout = create("UIListLayout", {
+                Parent = left,
+                HorizontalAlignment = Enum.HorizontalAlignment.Center,
+                SortOrder = Enum.SortOrder.LayoutOrder,
+                Padding = UDim.new(0, 12)
+            })
+
+            local right = create("Frame", {
+                Parent = tab,
+                AnchorPoint = Vector2.new(1, 0),
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                Position = UDim2.new(1, -12, 0, 12),
+                Size = UDim2.new(0.5, -18, 1, -24)
+            })
+
+            local rightLayout = create("UIListLayout", {
+                Parent = right,
+                HorizontalAlignment = Enum.HorizontalAlignment.Center,
+                SortOrder = Enum.SortOrder.LayoutOrder,
+                Padding = UDim.new(0, 12)
+            })
+
+            for _, button in next, p1:GetChildren() do
+                if(button:IsA("TextButton")) then
+                    button.Size = UDim2.new(1 / #menu.tabs, 0, 1, 0)
+                end
+            end
+
+            btn.MouseButton1Click:Connect(function()
+                self:Show()
+            end)
+
+            local function fixScrollSize()
+                tab.CanvasSize = UDim2.new(0, 0, 0, (leftLayout.AbsoluteContentSize.Y < rightLayout.AbsoluteContentSize.Y and rightLayout.AbsoluteContentSize.Y or leftLayout.AbsoluteContentSize.Y) + 24)
+            end
+
+            leftLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(fixScrollSize)
+            rightLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(fixScrollSize)
+
+            self.inst = tab
+            self.btn = btn
+            self.containers = {left, right}
+        end
+    end
+
+    -- module functions
+    function menu:AddTab(name)
+        return tab.new(name)
+    end
+
+    function menu:Render(name, extension, build)
+        local gui = create("ScreenGui", {
+            Parent = game.CoreGui,
+            Name = name
+        })
+
+        local main = create("Frame", {
+            Parent = gui,
+            BackgroundColor3 = Color3.fromRGB(52, 134, 235),
+            BorderColor3 = Color3.fromRGB(0, 0, 0),
+            Position = UDim2.new(0.5, -250, 0.5, -300),
+            Size = UDim2.new(0, 500, 0, 600)
+        })
+
+        local back = create("Frame", {
+            Parent = main,
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            BackgroundColor3 = Color3.fromRGB(24, 24, 24),
+            BorderColor3 = Color3.fromRGB(60, 60, 70),
+            Position = UDim2.new(0.5, 0, 0.5, 0),
+            Size = UDim2.new(1, -4, 1, -4)
+        })
+
+        local selection = create("Frame", {
+            Parent = back,
+            AnchorPoint = Vector2.new(0.5, 0),
+            BackgroundColor3 = Color3.fromRGB(24, 24, 24),
+            BorderColor3 = Color3.fromRGB(60, 60, 70),
+            Position = UDim2.new(0.5, 0, 0, 27),
+            Size = UDim2.new(1, 0, 0, 25)
+        })
+
+        local selectionLayout = create("UIListLayout", {
+            Parent = selection,
+            FillDirection = Enum.FillDirection.Horizontal,
+            SortOrder = Enum.SortOrder.LayoutOrder
+        })
+
+        local tabs = create("Frame", {
+            Parent = back,
+            AnchorPoint = Vector2.new(0.5, 1),
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+            BackgroundTransparency = 1.000,
+            BorderSizePixel = 0,
+            Position = UDim2.new(0.5, 1, 1, 0),
+            Size = UDim2.new(1, 2, 1, -53)
+        })
+
+        local top = create("Frame", {
+            Parent = back,
+            AnchorPoint = Vector2.new(0.5, 0),
+            BackgroundColor3 = Color3.fromRGB(41, 41, 44),
+            BorderColor3 = Color3.fromRGB(60, 60, 70),
+            Position = UDim2.new(0.5, 0, 0, 0),
+            Size = UDim2.new(1, 0, 0, 26),
+        })
+
+        local text = create("TextLabel", {
+            Parent = top,
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+            BackgroundTransparency = 1.000,
+            Position = UDim2.new(0, 6, 0, 0),
+            Size = UDim2.new(0, 200, 1, -1),
+            Font = Enum.Font.Gotham,
+            Text = name,
+            TextColor3 = Color3.fromRGB(255, 255, 255),
+            TextSize = 15.000,
+            TextTransparency = 0.100,
+            TextXAlignment = Enum.TextXAlignment.Left
+        })
+
+        top.InputBegan:Connect(function(i)
+            if(i.UserInputType == Enum.UserInputType.MouseButton1) then
+                local lastPos = inputs:GetMouseLocation()
+                local mainPos = main.AbsolutePosition
+                local offset = mainPos - lastPos
+                local currentPos = offset + lastPos
+
+                local connection
+                connection = loops.RenderStepped:Connect(function()
+                    local newPos = inputs:GetMouseLocation()
+                    if newPos ~= lastPos then
+                        local currentX = (offset + newPos).X
+                        local currentY = (offset + newPos).Y
+                        local viewportSize = workspace.CurrentCamera.ViewportSize
+
+                        if (currentX < 0 and currentX < currentPos.X) or (currentX > (viewportSize.X - top.AbsoluteSize.X) and currentX > currentPos.X) then
+                            currentX = currentX < 0 and 0 or viewportSize.X - top.AbsoluteSize.X
+                        end
+
+                        if (currentY < 0 and currentY < currentPos.Y) or (currentY > (viewportSize.Y - main.AbsoluteSize.Y - 36) and currentY > currentPos.Y) then
+                            currentY = currentY < 0 and 0 or viewportSize.Y - main.AbsoluteSize.Y - 36
+                        end
+
+                        lastPos = newPos
+                        currentPos = Vector2.new(currentX, currentY)
+                        anim:Create(main, TweenInfo.new(0.008), {Position = UDim2.new(0, currentPos.X, 0, currentPos.Y)}):Play()
+                    end
+                end)
+                table.insert(self.storage, connection)
+
+                table.insert(self.storage, inputs.InputEnded:Connect(function(i2)
+                    if(connection and i2 == i) then
+                        connection:Disconnect()
+                    end
+                end))
+            end
+        end)
+
+        self.inst = gui
+        for _, tab in next, self.tabs do
+            tab:Init(selection, tabs)
+
+            for _, section in next, tab.sections do
+                section:Init(tab.containers[section.pos])
+
+                for _, object in next, section.objects do
+                    object:Init(section.container)
+
+                    if(object.subs) then
+                        for _, sub in next, object.subs do
+                            sub:Init(object.container, object.button)
+                        end
+                    end
+                end
+            end
+        end
+
+        if(self.tabs[1]) then
+            self.tabs[1]:Show()
+        end
+
+        self.name = name
+        self.extension = extension
+        self.build = build
+    end
+
+    function menu:Remove()
+        if(menu and menu.inst) then
+            for _, connection in next, self.storage do
+                connection:Disconnect()
+            end
+
+            menu.inst:Destroy()
+            menu = nil
+        end
+    end
+
+    function menu:Toggle(state)
+        self.inst.Enabled = state or not self.inst.Enabled
+    end
+
+    function menu:Notification(text, time)
+        if(not self.notifications) then
+            local notifications = create("ScreenGui", {
+                Parent = self.inst
+            })
+
+            notifications.ChildRemoved:Connect(function()
+                if(#notifications:GetChildren() <= 0) then
+                    return
+                end
+
+                for pos_in_list, notification in next, self.notifications:GetChildren() do
+                    animate(notification, {time = 0.5}, {
+                        Position = UDim2.new(0, 10, 0, 40 + ((pos_in_list - 1) * 35))
+                    })
+                end
+            end)
+
+            self.notifications = notifications
+        end
+
+        local position = UDim2.new(0, 10, 0, 40 + (#self.notifications:GetChildren() * 35))
+
+        local main = create("Frame", {
+            Parent = self.notifications,
+            BackgroundColor3 = Color3.fromRGB(52, 134, 235),
+            BorderColor3 = Color3.fromRGB(0, 0, 0),
+            Size = UDim2.new(0, 334, 0, 25)
+        })
+
+        local back = create("Frame", {
+            Parent = main,
+            AnchorPoint = Vector2.new(0.5, 1),
+            BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+            BorderColor3 = Color3.fromRGB(60, 60, 60),
+            Position = UDim2.new(0.5, 0, 1, -1),
+            Size = UDim2.new(1, -3, 1, -2)
+        })
+
+        local text = create("TextLabel", {
+            Parent = back,
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+            BackgroundTransparency = 1.000,
+            Size = UDim2.new(1, 0, 1, 0),
+            Font = Enum.Font.Gotham,
+            Text = text,
+            TextColor3 = Color3.fromRGB(255, 255, 255),
+            TextSize = 14.000,
+            TextTransparency = 0.100
+        })
+
+        main.Size = UDim2.new(0, text.TextBounds.X + 10, 0, 25)
+        main.Position = UDim2.new(0, -main.Size.X.Offset, 0, position.Y.Offset)
+
+        coroutine.wrap(function()
+            animate(main, {time = 0.5}, {Position = UDim2.new(0, 10, 0, main.Position.Y.Offset)})
+            wait(time or 2)
+            animate(main, {time = 0.5}, {Position = UDim2.new(0, -main.Size.X.Offset, 0, main.Position.Y.Offset)})
+            wait(0.5)
+            main:Destroy()
+        end)()
+    end 
+
+    function menu:Watermark(visible)
+        if(not self.watermark) then
+            local watermark = create("ScreenGui", {
+                Parent = self.inst
+            })
+
+            local main = create("Frame", {
+                Parent = watermark,
+                BackgroundColor3 = Color3.fromRGB(52, 134, 235),
+                BorderColor3 = Color3.fromRGB(0, 0, 0),
+                Position = UDim2.new(0, 10, 0, 10),
+                Size = UDim2.new(0, 244, 0, 25)
+            })
+
+            local back = create("Frame", {
+                Parent = main,
+                AnchorPoint = Vector2.new(0.5, 1),
+                BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+                BorderColor3 = Color3.fromRGB(60, 60, 60),
+                Position = UDim2.new(0.5, 0, 1, -1),
+                Size = UDim2.new(1, -2, 1, -3)
+            })
+
+            local text = create("TextLabel", {
+                Parent = back,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1.000,
+                Size = UDim2.new(1, 0, 1, 0),
+                Font = Enum.Font.Gotham,
+                Text = string.format("%s | %s | %s", self.name, self.build, os.date("%b, %d, %Y")),
+                TextColor3 = Color3.fromRGB(255, 255, 255),
+                TextSize = 14.000,
+                TextTransparency = 0.100
+            })
+
+            main.Size = UDim2.new(0, text.TextBounds.X + 10, 0, 25)
+
+            self.watermark = watermark
+        end
+
+        self.watermark.Enabled = visible or not self.watermark.Enabled
+    end
+
+    -- config functions
+    function menu:GetConfigs(specific) -- if config is definied <string> will return that config or false 
+        local configs = {}
+
+        for _, file in next, listfiles() do
+            local name = string.sub(file, 1, #file - (#self.extension + 1))
+            local extensions = string.split(file, ".")
+            local extension = extensions[#extensions]
+            local content = readfile(file)
+
+            if(extension ~= self.extension or not is_json(content)) then
+                continue -- file is not config
+            end
+
+            if(specific and file == specific) then
+                return true, json.decode(content)
+            end
+
+            table.insert(configs, {
+                name = name,
+                config = json.decode(content)
+            })
+        end
+
+        if(specific) then
+            return false
+        end
+
+        return configs
+    end
+
+    function menu:SaveConfig(name)
+        if(name == "Default" or name == "nil") then
+            return menu:Notification("Invalid file name")
+        end
+
+        local data = {}
+
+        for flag, value in next, self.flags do
+            if(flag == "nil") then
+                continue
+            end
+
+            if(type(value) == "Color3") then
+                value = {value.r, value.g, value.b}
+            end
+
+            data[flags] = value
+        end
+
+        writefile(name .. "." .. self.extension, json.encode(data))
+        menu:Notification("Saved config to " .. name .. "." .. self.extension)
+    end
+
+    function menu:LoadConfig(name)
+        local exsists, config = self:GetConfigs(name)
+        
+        if(not exsists) then
+            return menu:Notification("Config " .. name .. "." .. self.extension .. " dose not exsist")
+        end
+
+        for _, tab in next, self.tabs do
+            -- if(tab.name == "Settings") then
+            --    "continue"
+            -- end
+
+            for _, section in next, tab.sections do
+                for _, object in next, section.objects do
+                    if(object.flag and config[object.flag]) then
+
+
+                        if(object.subs) then
+                            for _, sub in next, object.subs do
+
+                            end
+                        end
+
+                    end
+                end
+            end
+        end
+
+        menu:Notification("Loaded " .. name .. "." .. self.extension)
+    end
+
+    function menu:DeleteConfig(name)
+
+    end
+
+    -- other
+    local hide_con
+    hide_con = inputs.InputBegan:Connect(function(input, gpe)
+        if(not menu) then
+            hide_con:Disconnect()
+            return
+        end
+
+        if(not inputs:GetFocusedTextBox() and (input.KeyCode == Enum.KeyCode[menu.flags["toggle_key"] or "RightShift"])) then
+            menu:Toggle()
+        end
+    end)
+end
+
+if(place == 292439477) then -- phantom forces
+
+    -- menu
+    local legit_tab = menu:AddTab("Legit")
+    local legit_aim_assist = legit_tab:AddSection("Aim Assist", 1)
+    local legit_extra = legit_tab:AddSection("Extra", 1)
+    local legit_trigger_bot = legit_tab:AddSection("Trigger Bot", 2)
+    local legit_br = legit_tab:AddSection("Bullet Redirection", 2)
+
+    legit_aim_assist:AddToggle("Enabled", {
+
+    })
+
+    legit_extra:AddToggle("Expand Hitboxes", {
+        flag = "expand_hitboxes"
+    })
+
+    legit_extra:AddSlider("Hitbox Size Scale", {
+        flag = "hitbox_size_scale",
+        max = 7
+    })
+    
+    legit_trigger_bot:AddToggle("Enabled", {
+
+    })
+
+    legit_br:AddToggle("Enabled", {
+
+    })
+
+    local rage_tab = menu:AddTab("Rage")
+    local rage_ragebot = rage_tab:AddSection("Rage Bot", 1)
+    local rage_extra = rage_tab:AddSection("Extra", 1)
+    local rage_aa = rage_tab:AddSection("Anti Aim", 2)
+    local rage_hvh = rage_tab:AddSection("Hack Vs. Hack", 2)
+
+    rage_ragebot:AddToggle("Enabled", {
+        flag = "rage_bot"
+    })
+
+    rage_ragebot:AddList("Target Selection", {
+        flag = "rage_bot_target_selection",
+        values = {
+            "Cycle",
+            "Near crosshair",
+            "Lowest distance",
+            "Lowest health",
+            "Highest damage"
+        },
+        value = "Near crosshair"
+    })
+
+    rage_ragebot:AddToggle("Auto Shoot", {
+        flag = "auto_shoot"
+    })
+
+    rage_ragebot:AddToggle("Auto Wall", {
+        flag = "auto_wall"
+    })
+
+    --[[rage_ragebot:AddToggle("Origin Modifier", {
+        flag = "modify_origin"
+    })]]
+
+    rage_ragebot:AddList("Hitscan Points", {
+        flag = "hitscan_points",
+        values = bones.R6,
+        value = {
+            "Head",
+            "Torso"
+        }
+    })
+
+    rage_ragebot:AddList("Hitscan Priority", {
+        flag = "hitscan_priority",
+        values = bones.R6,
+        value = "Head"
+    })
+
+    rage_extra:AddToggle("Fake Lag", {
+        flag = "fake_lagg"
+    })
+
+    rage_extra:AddSlider("Fake Lag Interval", {
+        flag = "fake_lag_interval",
+        min = 1,
+        max = 3000,
+        value = 1000,
+        suffix = "ms"
+    })
+
+    rage_extra:AddToggle("Knife Bot", {
+        flag = "knife_bot"
+    })
+
+    rage_extra:AddSlider("Knife Bot Range", {
+        flag = "knife_bot_range",
+        min = 0,
+        max = 50,
+        value = 25,
+        suffix = "m"
+    })
+
+    rage_aa:AddToggle("Enabled", {
+        flag = "anti_aim_enabled"
+    })
+
+    rage_aa:AddList("Pitch", {
+        flag = "anti_aim_pitch",
+        values = {
+            "Up",
+            "Zero",
+            "Down"
+        },
+        value = "Down"
+    })
+
+    rage_aa:AddList("Yaw", { -- yaw base is camera
+        flag = "anti_aim_yaw",
+        values = {
+            "Forward",
+            "Right",
+            "Left",
+            "Back"
+        },
+        value = "Back"
+    })
+
+    rage_aa:AddToggle("Spin Bot", {
+        flag = "spin_bot"
+    })
+
+    rage_aa:AddSlider("Spin Speed", {
+        flag = "spin_speed",
+        value = 30
+    })
+
+    rage_aa:AddToggle("Underground", {
+        flag = "anti_aim_underground"
+    })
+
+    rage_aa:AddSlider("Underground Distance", {
+        flag = "underground_distance",
+        max = 10
+    })
+
+    rage_aa:AddList("Stance", {
+        flag = "anti_aim_stance",
+        values = {
+            "Stand",
+            "Crouch",
+            "Prone"
+        },
+        value = "Prone",
+        callback = function(state)
+            if(state) then
+                client.network:send("stance", "")
+            end
+        end
+    })
+
+    rage_hvh:AddToggle("Resolve Stance", {
+        flag = "resolve_stance"
+    })
+
+    rage_hvh:AddToggle("Resolve Look Angle", {
+        flag = "resolve_angle"
+    })
+
+    local esp_tab = menu:AddTab("Esp")
+    local esp_enemie = esp_tab:AddSection("Enemie", 1)
+    local esp_world = esp_tab:AddSection("World", 1)
+    local esp_team = esp_tab:AddSection("Team", 2)
+    local esp_settings = esp_tab:AddSection("Settings", 2)
+
+    esp_enemie:AddToggle("Enabled", {
+        flag = "enemie_enabled"
+    })
+
+    esp_enemie:AddToggle("Name", {
+        flag = "enemie_name"
+    }):AddColor({
+        flag = "enemie_name_color",
+        alpha = 1
+    })
+
+    esp_enemie:AddToggle("Weapon", {
+        flag = "enemie_weapon"
+    }):AddColor({
+        flag = "enemie_weapon_color",
+        alpha = 1
+    })
+
+    esp_enemie:AddToggle("Bounding Box", {
+        flag = "enemie_box"
+    }):AddColor({
+        flag = "enemie_box_color",
+        alpha = 1
+    })
+
+    esp_enemie:AddToggle("Skeleton", {
+        flag = "enemie_skeleton"
+    }):AddColor({
+        flag = "enemie_skeleton_color",
+        alpha = 1
+    })
+
+    esp_enemie:AddToggle("Health Bar", {
+        flag = "enemie_health_bar"
+    })
+
+    esp_enemie:AddToggle("Health Bar Color", {
+        flag = "enemie_health_bar_custom"
+    }):AddColor({
+        flag = "enemie_health_bar_color",
+        alpha = 1
+    })
+
+    local enemie_chams = esp_enemie:AddToggle("Chams", {
+        flag = "enemie_chams"
+    }) do 
+        enemie_chams:AddColor({
+            flag = "enemie_chams_vis_color",
+            alpha = 1
+        })
+
+        enemie_chams:AddColor({
+            flag = "enemie_chams_color",
+            alpha = 1
+        })
+    end
+
+    esp_world:AddToggle("Weapons", {
+        flag = "weapon_names",
+    }):AddColor({
+        flag = "weapon_name_color",
+        alpha = 1
+    })
+
+    esp_world:AddToggle("Frag Warning", {
+        flag = "frag_warning"
+    }):AddColor({
+        flag = "frag_warning_color",
+        alpha = 1
+    })
+
+    esp_team:AddToggle("Enabled", {
+        flag = "team_enabled"
+    })
+
+    esp_team:AddToggle("Name", {
+        flag = "team_name"
+    }):AddColor({
+        flag = "team_name_color",
+        alpha = 1
+    })
+
+    esp_team:AddToggle("Weapon", {
+        flag = "team_weapon"
+    }):AddColor({
+        flag = "team_weapon_color",
+        alpha = 1
+    })
+
+    esp_team:AddToggle("Bounding Box", {
+        flag = "team_box"
+    }):AddColor({
+        flag = "team_box_color",
+        alpha = 1
+    })
+
+    esp_team:AddToggle("Skeleton", {
+        flag = "team_skeleton"
+    }):AddColor({
+        flag = "team_skeleton_color",
+        alpha = 1
+    })
+
+    esp_team:AddToggle("Health Bar", {
+        flag = "team_health_bar"
+    })
+
+    esp_team:AddToggle("Health Bar Color", {
+        flag = "team_health_bar_custom"
+    }):AddColor({
+        flag = "team_health_bar_color",
+        alpha = 1
+    })
+
+    local team_chams = esp_team:AddToggle("Chams", {
+        flag = "team_chams"
+    }) do 
+        team_chams:AddColor({
+            flag = "team_chams_vis_color",
+            alpha = 1
+        })
+
+        team_chams:AddColor({
+            flag = "team_chams_color",
+            alpha = 1
+        })
+    end
+
+    esp_settings:AddToggle("Scale Text Size", {
+        flag = "scale_text_size"
+    })
+
+    esp_settings:AddSlider("Text Size", {
+        flag = "text_size",
+        max = 20,
+        value = 13
+    })
+
+    esp_settings:AddSlider("Max Text Length", {
+        flag = "text_length",
+        min = 1,
+        max = 20,
+        value = 5
+    })
+
+    esp_settings:AddList("Text Font", {
+        flag = "text_font",
+        values = {
+            "UI",
+            "System",
+            "Plex",
+            "Monospace"
+        },
+        value = "Plex"
+    })
+
+
+    local visuals_tab = menu:AddTab("Visuals")
+    local visuals_local = visuals_tab:AddSection("Local", 1)
+    local visuals_world = visuals_tab:AddSection("World", 1)
+    local visuals_cam = visuals_tab:AddSection("Camera", 2)
+    local visuals_extra = visuals_tab:AddSection("Extra", 2)
+
+    visuals_local:AddToggle("Weapon Chams", {
+        flag = "weapon_chams"
+    }):AddColor({
+        flag = "weapon_chams_color",
+        alpha = 1
+    })
+
+    visuals_local:AddList("Weapon Material", {
+        flag = "weapon_material",
+        values = {
+            "Plastic",
+            "ForceField",
+            "Neon"
+        },
+        value = "Plastic"
+    })
+
+    visuals_local:AddToggle("Player Chams", {
+        flag = "local_chams"
+    }):AddColor({
+        flag = "local_chams_color",
+        alpha = 1
+    })
+
+    visuals_local:AddList("Player Material", {
+        flag = "local_material",
+        values = {
+            "Plastic",
+            "ForceField",
+            "Neon"
+        },
+        value = "Plastic"
+    })
+
+    visuals_local:AddToggle("Third Person", {
+        flag = "third_person"
+    }):AddBind({
+        flag = "third_person_key"
+    })
+
+    visuals_local:AddSlider("Third Person Distance", {
+        flag = "third_person_distance",
+        max = 150,
+        value = 10
+    })
+
+    visuals_world:AddToggle("Ambience", {
+        flag = "change_ambience"
+    }):AddColor({
+        flag = "ambience_color"
+    })
+
+    visuals_world:AddToggle("Change Time", {
+        flag = "change_time"
+    })
+
+    visuals_world:AddSlider("Time", {
+        flag = "changed_time",
+        max = 24,
+        value = 12
+    })
+
+    visuals_world:AddToggle("Custom Skybox", {
+        flag = "use_custom_skybox"
+    })
+
+    visuals_world:AddList("Skybox", {
+        flag = "custom_skybox",
+        values = {
+            "Nebula",
+            "Galaxy",
+            "Blackhole",
+            "Hell",
+            "Burble Sky"
+        },
+        value = "Nebula"
+    })
+
+    visuals_cam:AddSlider("Camera Recoil Reduction", {
+        flag = "camera_recoil_reduction",
+        value = 0,
+        suffix = "%"
+    })
+
+    visuals_cam:AddSlider("Camera Fov", {
+        flag = "camera_fov",
+        min = 1, -- 0 == kick?
+        max = 120,
+        value = 70,
+        callback = function(value)
+            client.char.unaimedfov = value
+        end
+    })
+
+    visuals_cam:AddToggle("No Gun Bob", {
+        flag = "no_gun_bob"
+    })
+
+    visuals_cam:AddToggle("No Scope Sway", {
+        flag = "no_scope_sway"
+    })
+
+    visuals_cam:AddToggle("Disable ADS Fov", {
+        flag = "disable_ads_fov"
+    })
+
+    visuals_cam:AddToggle("No Scope Border", {
+        flag = "no_scope_border"
+    })
+
+    visuals_extra:AddToggle("Bullet Tracers", {
+        flag = "bullet_tracers"
+    }):AddColor({
+        flag = "bullet_tracer_color",
+        color = Color3.fromRGB(255, 255, 0),
+        alpha = 0.75
+    })
+
+    visuals_extra:AddToggle("Bullet Impacts", {
+        flag = "bullet_impacts"
+    }):AddColor({
+        flag = "bullet_impact_color",
+        color = Color3.fromRGB(255, 0, 128),
+        alpha = 0.75
+    })
+
+    visuals_extra:AddToggle("Frag Radius", {
+        flag = "frag_radius"
+    }):AddColor({
+        flag = "frag_radius_color",
+        color = Color3.fromRGB(255, 0, 0),
+        alpha = 0.75
+    })
+
+    visuals_extra:AddToggle("Blood Color", {
+        flag = "blood_color"
+    }):AddColor({
+        flag = "blood_color_color"
+    })
+
+    visuals_extra:AddToggle("Bullet Particle Color", {
+        flag = "custom_bullet_particle"
+    }):AddColor({
+        flag = "bullet_particle_color"
+    })
+
+    --[[visuals_extra:AddToggle("Draw Desync Pos", {
+        flag = "show_desync"
+    })]]
+
+
+    local misc_tab = menu:AddTab("Misc")
+    local misc_movement = misc_tab:AddSection("Movement", 1)
+    local misc_extra = misc_tab:AddSection("Extra", 1)
+    local misc_exploits = misc_tab:AddSection("Exploits", 2)
+    local misc_gunmods = misc_tab:AddSection("Weapon Mods", 2)
+
+    misc_movement:AddToggle("Fly", {
+        flag = "fly",
+        callback = function(state)
+            if(not state and client.char.alive) then
+                local_plr.Character.HumanoidRootPart.Velocity = Vector3.new()
+                local_plr.Character.HumanoidRootPart.Anchored = false
+            end
+        end
+    })
+
+    misc_movement:AddSlider("Fly Speed", {
+        flag = "fly_speed",
+        max = 100,
+        value = 75
+    })
+
+    misc_movement:AddToggle("Strafe", {
+        flag = "strafe"
+    })
+
+    misc_movement:AddSlider("Strafe Speed", {
+        flag = "strafe_speed",
+        max = 160,
+        value = 40
+    })
+
+    misc_movement:AddToggle("Bunny Hop", {
+        flag = "bunny_hop"
+    })
+
+    misc_movement:AddToggle("Bypass Fall Damage", {
+        flag = "bypass_fall_damage"
+    })
+
+    misc_movement:AddToggle("Bypass Freeze", {
+        flag = "bypass_freeze"
+    })
+
+    misc_extra:AddToggle("Auto Vote", {
+        flag = "auto_vote"
+    })
+
+    misc_extra:AddList("Vote Option", {
+        flag = "auto_vote_option",
+        values = {
+            "Yes",
+            "No"
+        },
+        value = "No"
+    })
+
+    misc_extra:AddToggle("Custom Hit Sound", {
+        flag = "custom_hit_sound"
+    })
+
+    misc_extra:AddList("Hit Sound", {
+        flag = "hit_sound",
+        values = {
+            "Skeet",
+            "Neverloose",
+            "Bameware"
+        },
+        value = "Skeet"
+    })
+
+    misc_extra:AddToggle("Kill Say", {
+        flag = "kill_say"
+    })
+
+    misc_extra:AddToggle("Death Say", {
+        flag = "death_say"
+    })
+
+    misc_extra:AddToggle("Chat Spam", {
+        flag = "chat_spam"
+    })
+
+    misc_extra:AddToggle("Hide Names", {
+        flag = "hide_names"
+    })
+
+    local ban_debounce
+    misc_extra:AddButton("Ban Self", {
+        callback = function()
+            if(not ban_debounce) then
+                ban_debounce = true
+                menu:Notification("This is permentent, click again to confirm")
+
+                coroutine.wrap(function()
+                    wait(5)
+                    ban_debounce = false
+                end)()
+            else
+                menu.flags["bypass_fall_damage"] = false
+                client.network:send("falldamage", nil, true)
+            end
+        end
+    })
+
+    --[[misc_exploits:AddButton("Move To Safe Point", {
+        callback = function()
+            if(client.char.alive and local_plr.Character and local_plr.Character:FindFirstChild("HumanoidRootPart")) then
+                animate(local_plr.Character.HumanoidRootPart, {time = 1.2}, {CFrame = local_plr.Character.HumanoidRootPart.CFrame + Vector3.new(0, 0, 19.5)})
+            end
+        end
+    })]]
+
+    misc_exploits:AddButton("Crash Server", {
+        callback = function()
+            local client_graph = {} do
+
+            end
+
+            local server_graph = {} do
+
+            end
+        end
+    })
+
+    misc_exploits:AddToggle("Crimwalk", {
+        flag = "godmode"
+    }):AddBind({
+        flag = "godmode_key"
+    })
+
+    local backup_collisions = {}
+    misc_exploits:AddToggle("Wall Phase", {
+        callback = function(state)
+            menu:Notification("This exploit only works while in crimwalk")
+            
+            for _, part in next, workspace.Map.Map:GetDescendants() do -- rip
+                if(part:IsA("BasePart")) then
+                    if(not backup_collisions[part]) then
+                        backup_collisions[part] = part.CanCollide
+                    end
+
+                    if(state) then
+                        part.CanCollide = false
+                    else
+                        part.CanCollide = backup_collisions[part]
+                    end
+                end
+            end
+        end
+    })
+
+    misc_exploits:AddToggle("Spoof Hitpart", {
+        flag = "spoof_hitpart"
+    })
+
+    misc_exploits:AddList("Spoofed Hitpart", {
+        flag = "spoofed_hitpart",
+        values = bones.R6,
+        value = "Head"
+    })
+
+    misc_gunmods:AddToggle("Enabled", {
+        flag = "gun_mods"
+    })
+
+    misc_gunmods:AddToggle("Remove Animations", {
+        flag = "remove_shoot_animation"
+    })
+
+    misc_gunmods:AddToggle("Fully Automatic", {
+        flag = "full_auto"
+    })
+
+    misc_gunmods:AddToggle("Instant Reload", {
+        flag = "instant_reload"
+    })
+
+    misc_gunmods:AddToggle("Instant Equip", {
+        flag = "instant_equip"
+    })
+
+    misc_gunmods:AddToggle("Run And Gun", {
+        flag = "run_and_gun"
+    })
+
+    misc_gunmods:AddSlider("Recoil Reduction", { -- reduces x and y, may make a slider for both
+        flag = "gun_recoil_reduction",
+        max = 100,
+        value = 0,
+        suffix = "%"
+    })
+
+    misc_gunmods:AddSlider("Spread Reduction", {
+        flag = "spread_reduction",
+        max = 100,
+        value = 0,
+        suffix = "%"
+    })
+
+    misc_gunmods:AddSlider("Bullet Speed Addition", {
+        flag = "bullet_speed_addition",
+        max = 1000
+    })
+
+    misc_gunmods:AddSlider("Fire Rate Addition", {
+        flag = "fire_rate_addition",
+        max = 300
+    })
+
+    
+    local settings_tab = menu:AddTab("Settings")
+    local settings_menu = settings_tab:AddSection("Menu", 1)
+    local settings_extra = settings_tab:AddSection("Extra", 1)
+    local settings_config = settings_tab:AddSection("Config", 2)
+    local settings_fake_angles = settings_tab:AddSection("Fake Angles", 1)
+
+    settings_menu:AddToggle("Menu Accent", {
+        callback = function()
+            
+        end
+    }):AddColor({
+        color = Color3.fromRGB(52, 134, 235),
+        callback = function(color)
+
+        end
+    })
+
+    settings_menu:AddToggle("Watermark", {
+        flag = "watermark",
+        state = true,
+        callback = function(state)
+            menu:Watermark(state)
+        end
+    })
+
+    settings_extra:AddToggle("Anti AFK", {
+        flag = "anti_afk",
+        state = true
+    })
+
+    settings_extra:AddButton("Create Join Script", {
+        callback = function()
+            setclipboard(string.format(PSU_ENCRYPT_STRING('game.TeleportService:TeleportToPlaceInstance(%s, "%s", game.Players.LocalPlayer)'), game.PlaceId, game.JobId))
+        end
+    })
+
+    settings_extra:AddButton("Unload Cheat", {
+        callback = function()
+            menu:Remove()
+        end
+    })
+
+    settings_config:AddBox("Config Name", {
+        
+    })
+
+    settings_config:AddList("Selected Config", {
+
+    })
+
+    settings_config:AddButton("Load Config", {
+
+    })
+
+    settings_config:AddButton("Save Config", {
+
+    })
+
+    settings_config:AddButton("Delete Config", {
+
+    })
+
+    local function fake_angle(state)
+        
+    end
+
+    settings_fake_angles:AddToggle("Enabled", {
+        flag = "fake_angles"
+    })
+
+    settings_fake_angles:AddLabel("13> You're Invincible")
+
+    settings_fake_angles:AddLabel("Bigger Offset More Unstable")
+
+    settings_fake_angles:AddSlider("X Offset", {
+        flag = "fake_x",
+        min = -20,
+        max = 20,
+        value = 0
+    })
+    
+    settings_fake_angles:AddSlider("Y Offset", {
+        flag = "fake_y",
+        min = -20,
+        max = 20,
+        value = 0
+    })
+
+    settings_fake_angles:AddSlider("Z Offset", {
+        flag = "fake_z",
+        min = -20,
+        max = 20,
+        value = 0
+    })
+
+
+    client.spin_angle = 0
+    client.chat_queue = {}
+    client.last_update = {}
+    client.old_data = {}
+    client.esp = {}
+
+    do -- other drawings
+        client.text_bounds = draw("Text", { -- used to calc text size / pos offset
+            Font = 2,
+            Text = "",
+            Size = 13,
+            Center = true,
+            Outline = true,
+            Visible = false,
+            Transparency = 1,
+            Color = Color3.new(1, 1, 1),
+            Position = Vector2.new(),
+            OutlineColor = Color3.new(),
+        })
+
+        client.fov_circle = draw("Circle", {
+
+        })
+
+        client.silent_fov_circle = draw("Circle", {
+
+        })
+    end
+
+    -- loadstringed for obfuscated performence
+    local external_modules, gcsize = loadstring(PSU_ENCRYPT_STRING([[
+        local YourMothersWeight = 0 -- omw to fuck your mother
+        local type, local_plr = ...
+        local collected = {}
+
+        for _, data in next, getgc(true) do
+            local type = type(data)
+    
+            if(type == "table") then
+                local tbl = data
+    
+                if(rawget(tbl, "gammo")) then
+                    collected.logic = tbl
+                elseif(rawget(tbl, "send")) then
+                    collected.network = tbl
+                elseif(rawget(tbl, "setbasewalkspeed")) then
+                    collected.char = tbl
+                elseif(rawget(tbl, "checkkillzone")) then
+                    collected.roundsystem = tbl
+                elseif(rawget(tbl, "basecframe")) then
+                    collected.camera = tbl
+                elseif(rawget(tbl, "PlaySound")) then
+                    collected.sound = tbl
+                elseif(rawget(tbl, "new") and rawget(tbl, "step") and rawget(tbl, "reset")) then
+                    collected.particle = tbl
+                elseif(rawget(tbl, "isplayeralive")) then
+                    collected.hud = tbl
+                    collected.is_alive = function(p)
+                        return tbl:isplayeralive(p)
+                    end
+                    collected.get_health = function(p)
+                        return tbl:getplayerhealth(p)
+                    end
+                elseif(rawget(tbl, "getbodyparts")) then
+                    local old_getupdater = tbl.getupdater
+                    local old_loadplayer = getupvalue(old_getupdater, 2)
+
+                    collected.old_getupdater = old_getupdater
+                    tbl.getupdater = function(p)
+                        setupvalue(old_loadplayer, 1, "rofl")
+                        local updater = old_getupdater(p)
+                        setupvalue(old_loadplayer, 1, local_plr)
+
+                        return updater
+                    end
+
+                    collected.replication = tbl
+                    collected.get_char = function(p)
+                        -- local char_tbl = tbl.getbodyparts(p)
+                        --return char_tbl and char_tbl.rootpart and char_tbl.rootpart.Parent
+
+                        -- fix for "[Update date: 7/22/2021] Temporary custom replication solution has been put in place due to a roblox update"
+                        if(p ~= local_plr) then
+                            local char_tbl = tbl.getbodyparts(p)
+                            return char_tbl and char_tbl.head and char_tbl.head.Parent 
+                        end
+                    end
+                end
+            end
+    
+            if(type == "function" and islclosure(data)) then
+                local func, name, constants = data, getinfo(data).name, getconstants(data)
+    
+                if(name == "trajectory") then
+                    collected.trajectory = func -- <vector3, number>
+                elseif(table.find(constants, "Victim") and table.find(constants, "killfeed")) then
+                    collected.killfeed = func 
+                end
+            end
+
+            -- YourMothersWeight++
+            YourMothersWeight = YourMothersWeight + 1
+        end
+
+        return collected, YourMothersWeight
+    ]]))(type, local_plr)
+
+    for name, module in next, external_modules do
+        client[name] = module
+    end
+
+    for _, module in next, game.ReplicatedStorage.GunModules:GetChildren() do -- backup old gun data
+        local gun_data = {}
+
+        for stat, val in next, require(module) do
+            gun_data[stat] = val
+        end
+
+        client.old_data[string.lower(module.name)] = gun_data
+    end
+
+    local old_send = client.network.send
+    local old_particle = client.particle.new
+    local old_play_sound = client.sound.PlaySound
+    local old_jump_height = client.char.jump
+    local old_walk_speed = client.char.setbasewalkspeed
+    local old_basefov = client.char.unaimedfov
+    local old_setsway = client.camera.setsway
+
+    local bullet_check = require(game.ReplicatedFirst.SharedModules.Old.BulletCheck)
+    local public_settings = require(game.ReplicatedFirst.SharedModules.SharedConfigs.PublicSettings)
+    
+    local function shootgun(origin, part)
+        if(not client.logic.currentgun or (client.logic.currentgun and getupvalue(client.logic.currentgun.shoot, 2) <= 0)) then
+            return -- no gun / ammo
+        end
+
+        local gun = client.logic.currentgun
+
+        local step_upvalues = getupvalues(gun.step)
+        local fireround = step_upvalues[#step_upvalues]
+        local upvalues = getupvalues(fireround)
+
+        local offsets = {particle = 48, network = 52, check = 2}
+        local old_particle = upvalues[offsets.particle]
+        local old_network = upvalues[offsets.network]
+        local old_check = upvalues[offsets.check]
+
+        local old_send = old_network.send
+        local old_new = old_particle.new
+
+        setupvalue(fireround, offsets.network, {
+            send = function(self, event, ...)
+                local args = {...}
+
+                if(event == "newbullets") then
+                    local direction = client.trajectory(origin, public_settings.bulletAcceleration, part.Position, gun.data.bulletspeed)
+
+                    args[1].firepos = origin
+                    args[1].camerapos = client.camera.cframe.p
+                    for _, bullet in next, args[1].bullets do
+                        bullet[1] = direction
+                    end
+                end
+
+                setupvalue(fireround, offsets.network, old_network)
+                return old_send(self, event, unpack(args))
+            end
+        })
+
+        setupvalue(fireround, offsets.particle, { -- redirect particle direction and force hit
+            new = function(data)
+                local direction = client.trajectory(data.visualorigin, public_settings.bulletAcceleration, part.Position, gun.data.bulletspeed)
+                data.velocity = direction
+                data.position = part.Position
+                data.limb = part.Name
+                data.hit = part
+                
+                setupvalue(fireround, offsets.particle, old_particle)
+                return old_new(data)
+            end
+        })
+
+        setupvalue(fireround, offsets.check, function()
+            setupvalue(fireround, offsets.check, old_check)
+    
+            return true
+        end)  
+    end
+
+    local scope_cache = {}
+    local function apply_gun_modifications()
+        if(not client.logic.currentgun or (client.logic.currentgun and client.logic.currentgun == "KNIFE")) then
+            return -- no gun or knife so return
+        end
+
+        local enabled = menu.flags["gun_mods"]
+        local gun = client.logic.currentgun
+        local gun_data = gun.data
+        local old_gun_data = client.old_data[string.lower(gun.name)]
+
+        if(gun.data) then
+            if(gun.data.equipspeed) then
+                gun.data.equipspeed = (enabled and menu.flags["instant_equip"]) and math.random(100000, 700000) or old_gun_data.equipspeed
+            end
+
+            if(gun.data.bulletspeed) then
+                local bulletspeed = old_gun_data.bulletspeed
+
+                gun.data.bulletspeed = bulletspeed + (enabled and menu.flags["bullet_speed_addition"] or 0)
+            end
+
+            if(gun.data.firemodes) then
+                for i = 1, #gun.data.firemodes do
+                    gun.data.firemodes[i] = (enabled and menu.flags["full_auto"]) and true or old_gun_data.firemodes[i]
+                end
+            end
+
+            if(gun_data.animations) then
+                if(gun_data.animations.reload) then
+                    gun_data.animations.reload.timescale = (enabled and menu.flags["instant_reload"]) and 0 or old_gun_data.animations.reload.timescale
+    
+                    if(gun_data.animations.tacticalreload) then -- /shrug
+                        gun_data.animations.tacticalreload.timescale = (enabled and menu.flags["instant_reload"]) and 0 or old_gun_data.animations.tacticalreload.timescale
+                    end
+                end
+    
+                if((gun.type == "SNIPER" or gun.type == "DMR") and gun_data.animations.onfire) then
+                    gun_data.animations.onfire.timescale = (enabled and menu.flags["remove_shoot_animation"]) and 0 or old_gun_data.animations.onfire.timescale
+                    -- gun_data.animations.onfire.stdtimescale = (enabled and menu.flags["remove_shoot_animation"]) and 0 or old_gun_data.animations.onfire.stdtimescale ?
+                end
+            end
+
+            -- cam recoil reduction
+            local cam_recoil_multiplier = (100 - menu.flags["camera_recoil_reduction"]) / 100
+            gun.data.camkickmin = old_gun_data.camkickmin * cam_recoil_multiplier
+            gun.data.camkickmax = old_gun_data.camkickmax * cam_recoil_multiplier
+            gun.data.aimcamkickmin = old_gun_data.aimcamkickmin * cam_recoil_multiplier
+            gun.data.aimcamkickmax = old_gun_data.aimcamkickmax * cam_recoil_multiplier
+
+            -- gun recoil reduction
+            local gun_recoil_multiplier = enabled and (100 - menu.flags["gun_recoil_reduction"]) / 100 or 1
+            gun.data.aimtranskickmin = old_gun_data.aimtranskickmin * gun_recoil_multiplier
+            gun.data.aimtranskickmax = old_gun_data.aimtranskickmax * gun_recoil_multiplier
+            gun.data.transkickmin = old_gun_data.transkickmin * gun_recoil_multiplier
+            gun.data.transkickmax = old_gun_data.transkickmax * gun_recoil_multiplier
+            gun.data.rotkickmin = old_gun_data.rotkickmin * gun_recoil_multiplier
+            gun.data.rotkickmax = old_gun_data.rotkickmax * gun_recoil_multiplier
+            gun.data.aimrotkickmin = old_gun_data.aimrotkickmin * gun_recoil_multiplier
+            gun.data.aimrotkickmax = old_gun_data.aimrotkickmax * gun_recoil_multiplier
+
+            -- spread reduction
+            local spread_multiplier = enabled and (100 - menu.flags["spread_reduction"]) / 100 or 1
+            gun.data.hipfirespread = old_gun_data.hipfirespread * spread_multiplier
+            gun.data.hipfirestability = old_gun_data.hipfirestability * spread_multiplier
+        end
+
+        if(gun.memes) then
+            local firerate_pointer = old_gun_data.firerate
+            local firerate = gun_data.variablefirerate and firerate_pointer[1] or firerate_pointer
+
+            setupvalue(gun.memes, 4, firerate + (enabled and menu.flags["fire_rate_addition"] or 0))
+        end
+
+        if(gun.step) then
+            if(not client.old_gunbob) then -- function
+                client.old_gunbob = getupvalue(gun.step, 28)
+            end
+
+            setupvalue(gun.step, 28, menu.flags["no_gun_bob"] and function()
+                return CFrame.new(0, 0, 0)
+            end or client.old_gunbob)
+        end
+
+        for _, part in next, local_plr.PlayerGui.MainGui.ScopeFrame:GetChildren() do
+            for _, object in next, part:GetChildren( )do
+                if object:IsA("Frame")then
+                    if(not scope_cache[object]) then
+                        scope_cache[object] = object.Visible
+                    end
+
+                    if(menu.flags["no_scope_border"]) then
+                        object.Visible = false
+                    else
+                        object.Visible = scope_cache[object]
+                    end
+                end
+            end
+
+            if(part.Name=="SightFront") then
+                if(not scope_cache[part]) then
+                    scope_cache[part] = part.Visible
+                end
+
+                if(menu.flags["no_scope_border"]) then
+                    part.Visible = false
+                else
+                    part.Visible = scope_cache[part]
+                end
+            end
+
+            if(part.Name=="SightRear") then
+                if(not scope_cache[part]) then
+                    scope_cache[part] = part.Image
+                end
+
+                part.Image = menu.flags["no_scope_border"] and "" or scope_cache[part]
+            end
+        end
+    end
+
+    do -- hooks
+        if(debug) then
+            local global_methods = getrawmetatable(game)
+            local camera_methods = getrawmetatable(local_cam)
+
+            make_writeable(global_methods)
+            make_writeable(camera_methods)
+
+            local old_camera_newindex = camera_methods.__newindex
+            camera_methods.__newindex = function(self, key, value)
+                if(not menu) then
+                    camera_methods.__newindex = old_camera_newindex
+                    return old_camera_newindex(self, key, value)
+                end
+
+                if(not checkcaller() and menu.flags["third_person"] and tostring(self) == "Camera" and key == "CFrame" and client.char.alive and client.logic.currentgun and not client.logic.currentgun.isaiming()) then
+                    value = value * CFrame.new(0, 0, menu.flags["third_person_distance"])
+                end
+
+                if(menu.flags["disable_ads_fov"] and tostring(self) == "Camera" and key == "FieldOfView" and client.char.alive) then
+                    value = menu.flags["camera_fov"]
+                end
+
+                return old_camera_newindex(self, key, value)
+            end
+
+            local old_global_index = global_methods.__index
+            global_methods.__index = function(self, key)
+                if(not menu) then
+                    global_methods.__index = old_global_index
+                    return old_global_index(self, key)
+                end
+
+                if(menu.flags["hide_names"] and self:IsA("Player") and key == "Name") then
+                    return "Playe"
+                end
+
+                -- rawget slow, please define var... ok
+                if(not checkcaller() and menu.flags["bypass_freeze"] and self == rawget(client, "roundsystem") and key == "lock") then
+                    return false
+                end
+
+                if(not checkcaller() and menu.flags["expand_hitboxes"] and key == "Size" and table.find(bones.R6, tostring(self))) then
+                    local size = menu.flags["hitbox_size_scale"]
+                    
+                    return old_global_index(self, key) + Vector3.new(size, size, size)
+                end
+                
+                if(not checkcaller() and key == "CFrame" and client.logic.currentgun and client.logic.currentgun.type ~= "KNIFE" and (self == client.logic.currentgun.barrel or tostring(self) == "SightMark")) then
+                    
+                end
+
+                return old_global_index(self, key)
+            end
+        else
+            loadstring(PSU_ENCRYPT_STRING([[ 
+
+            ]]))()
+        end
+
+        local afk_connection
+        afk_connection = local_plr.Idled:Connect(function()
+            if(not menu) then
+                afk_connection:Disconnect()
+                return 
+            end
+            
+            if(menu.flags["anti_afk"]) then
+                fake_inputs:CaptureController()
+                fake_inputs:ClickButton2(Vector2.new())
+            end
+        end)
+
+        local frag_connection
+        frag_connection = workspace.Ignore.Misc.ChildAdded:Connect(function(part)
+            if(not menu) then
+                frag_connection:Disconnect()
+                return
+            end
+            
+            if(part.Name ~= "Trigger") then
+                return
+            end
+
+            if(menu.flags["frag_radius"]) then
+
+            end
+
+            if(menu.flags["frag_warning"]) then
+
+            end
+        end)
+
+        if(debug) then
+            local old_killfeed
+            old_killfeed = hookfunction(client.killfeed, function(killer, victim, ...)
+                if(not menu) then
+                    return old_killfeed(killer, victim, ...)
+                end
+
+                if(menu.flags["kill_say"] and killer == local_plr) then
+                    client.chat_queue[#client.chat_queue + 1] = string.format(messages.kill[math.random(1, #messages.kill)], victim.Name) 
+                    -- client.network:send("chatted", string.format(messages.kill[math.random(1, #messages.kill)], victim.Name))
+                end
+
+                if(menu.flags["death_say"] and victim == local_plr) then
+                    client.chat_queue[#client.chat_queue + 1] = string.format(messages.death[math.random(1, #messages.death)], killer.Name) .. " " .. math.random(1, 100)
+                    -- client.network:send("chatted", string.format(messages.death[math.random(1, #messages.death)], killer.Name))
+                end
+
+                return old_killfeed(killer, victim, ...)
+            end)
+        else
+            loadstring(PSU_ENCRYPT_STRING([[
+                local menu, killfeed, chat_queue, messages = ...
+                local old_killfeed
+                old_killfeed = hookfunction(killfeed, function(killer, victim, ...)
+                    if(not menu) then
+                        return old_killfeed(killer, victim, ...)
+                    end
+
+                    if(menu.flags["kill_say"] and killer == local_plr) then
+                        chat_queue[#chat_queue + 1] = string.format(messages.kill[math.random(1, #messages.kill)], victim.Name) .. " " .. math.random(1, 100)
+                    end
+
+                    if(menu.flags["death_say"] and victim == local_plr) then
+                        chat_queue[#chat_queue + 1] = string.format(messages.death[math.random(1, #messages.death)], killer.Name) .. " " .. math.random(1, 100)
+                    end
+
+                    return old_killfeed(killer, victim, ...)
+                end)
+            ]]))(menu, client.killfeed, client.chat_queue, messages)
+        end
+    end 
+
+    -- loops
+    local last_shot = 0
+    loops:BindToRenderStep("RageBot", 1, function()
+        if(not menu) then
+            loops:UnbindFromRenderStep("RageBot")
+            return 
+        end
+
+        if(not menu.flags["godmode"] and not client.roundsystem.lock and menu.flags["rage_bot"] and client.char.alive and client.logic.currentgun and client.logic.currentgun.type ~= "KNIFE") then
+            for _, player in next, players:GetPlayers() do
+                local teammate = player.Team == local_plr.Team
+                local alive = client.is_alive(player)
+                local char = client.get_char(player)
+
+                if(teammate or not alive or not char) then
+                    continue
+                end
+
+                local hit_part = char:FindFirstChild("Head")
+                if(hit_part) then
+                   
+                        local origin = (local_cam.CFrame * CFrame.new(0, 0, (menu.flags["third_person"] and not client.logic.currentgun.isaiming()) and -menu.flags["third_person_distance"] or 0)).Position + (hit_part.Position - local_cam.CFrame.Position).Unit * 8.5
+                        local can_hit
+                            
+                        if(menu.flags["auto_wall"]) then
+                            local velocity = client.trajectory(origin, public_settings.bulletAcceleration, hit_part.Position, client.logic.currentgun.data.bulletspeed)
+                            can_hit = bullet_check(origin, hit_part.Position, velocity, public_settings.bulletAcceleration, client.logic.currentgun.data.penetrationdepth + 0.1) -- you can get away with tiny bit more
+                        elseif(menu.flags["auto_shoot"]) then
+                            can_hit = #local_cam:GetPartsObscuringTarget({hit_part.Position}, {workspace.Terrain, workspace.Ignore, workspace.Players, local_cam}) < 1
+                        end
+
+                    if(can_hit) then
+                        local firerate_pointer = client.old_data[string.lower(client.logic.currentgun.name)].firerate
+                        local firerate = client.logic.currentgun.data.variablefirerate and firerate_pointer[1] or firerate_pointer
+
+                        if(tick() - last_shot > 60 / (firerate + (menu.flags["gun_mods"] and menu.flags["fire_rate_addition"] or 0))) then
+                            last_shot = tick()
+                            shootgun(origin, hit_part)
+                        end
+                    end
+                end
+            end
+        end
+    end)
+
+    loops:BindToRenderStep("Main", 2, function()
+        if(not menu) then
+            loops:UnbindFromRenderStep("Main")
+            return 
+        end
+
+        if(not menu.flags["godmode"] and not client.roundsystem.lock and menu.flags["knife_bot"] and client.char.alive) then
+            for _, player in next, players:GetPlayers() do
+                if(player ~= local_plr and player.Team ~= local_plr.Team) then
+                    local char = client.get_char(player)
+                    if(char and char.Head and (char.Head.Position - local_plr.Character.Head.Position).Magnitude <= menu.flags["knife_bot_range"]) then
+                        if(client.logic.currentgun and client.logic.currentgun.type ~= "KNIFE") then
+                            local old_slot = client.logic.currentgun.gunnumber
+                            client.network:send("equip", 3);
+                            client.network:send("knifehit", player, tick(), char.Head)
+                            client.network:send("equip", old_slot)
+                        else
+                            client.network:send("knifehit", player, tick(), char.Head)
+                        end
+                    end
+                end
+            end
+        end
+
+        if(menu.flags["resolve_stance"] or menu.flags["resolve_lookvector"]) then
+            for _, player in next, players:GetPlayers() do
+                if(player ~= local_plr) then
+                    local updater = client.old_getupdater(player)
+                    
+                    if(updater) then
+                        --[[if(menu.flags["resolve_angle"]) then
+                            local current_angles = updater.getlookangles()
+                            updater.setlookangles(Vector3.new(-4.7, current_angles.Y, 0))
+                        end]]
+
+                        if(menu.flags["resolve_stance"]) then
+                            updater.setstance("stand")
+                        end
+                    end
+                end
+            end
+        end
+
+        if(menu.flags["fly"] and client.char.alive) then
+            local direction = Vector3.new()
+
+            direction = inputs:IsKeyDown("W") and direction + local_cam.CFrame.LookVector or direction
+            direction = inputs:IsKeyDown("A") and direction - local_cam.CFrame.RightVector or direction
+            direction = inputs:IsKeyDown("S") and direction - local_cam.CFrame.LookVector or direction
+            direction = inputs:IsKeyDown("D") and direction + local_cam.CFrame.RightVector or direction
+            direction = inputs:IsKeyDown("Space") and direction + local_cam.CFrame.UpVector or direction
+            direction = inputs:IsKeyDown("LeftControl") and direction - local_cam.CFrame.UpVector or direction
+
+            if(not inputs:GetFocusedTextBox() and direction.Unit.X == direction.Unit.X) then
+                local_plr.Character.HumanoidRootPart.Velocity = direction.Unit * menu.flags["fly_speed"]
+            end
+            local_plr.Character.HumanoidRootPart.Anchored = inputs:GetFocusedTextBox() or direction == Vector3.new()
+        end
+
+        if((menu.flags["bunny_hop"] or menu.flags["strafe"]) and client.char.alive) then
+            if(not menu.flags["fly"] and (inputs:IsKeyDown(Enum.KeyCode.Space) or local_plr.Character.Humanoid:GetState() == Enum.HumanoidStateType.Freefall)) then
+                if(menu.flags["bunny_hop"]) then
+                    local_plr.Character.Humanoid.Jump = true
+                end
+
+                if(menu.flags["strafe"]) then
+                    local mover = local_plr.Character.HumanoidRootPart:FindFirstChildOfClass("BodyVelocity")
+
+                    if(mover) then
+                        mover.maxForce = Vector3.new(100000, 0, 100000)
+                        mover.Velocity = local_plr.Character.Humanoid.MoveDirection * menu.flags["strafe_speed"]
+                    end
+                end
+            else
+                local mover = local_plr.Character.HumanoidRootPart:FindFirstChildOfClass("BodyVelocity")
+
+                if(mover) then
+                    mover.maxForce = Vector3.new(0, 0, 0)
+                    mover.Velocity = Vector3.new(0, 2, 0)
+                end
+            end
+        end
+        
+        --[[if(menu.flags["bypass_freeze"] and client.roundsystem.lock) then -- shitty way tbh
+            client.roundsystem.lock = false -- need to make this specify to the freeze check as this is sorta important for other things
+        end]]
+
+        -- will add to changed connections later just super lazy rn
+        if(menu.flags["change_time"]) then
+            lighting.ClockTime = menu.flags["changed_time"]
+        end
+
+        --lighting.Ambient = menu.flags["change_ambience"] and menu.flags["ambience_color"] or Color3.fromRGB(0, 0, 0)
+        --lighting.OutdoorAmbient = menu.flags["change_ambience"] and menu.flags["ambience_color"] or Color3.fromRGB(127, 127, 127)
+    end)
+
+    loops:BindToRenderStep("Esp", 1, function()
+        for object, drawings in next, client.esp do
+            local obj_type = drawings.type
+
+            if(obj_type == "player") then
+                if(not players:FindFirstChild(object.Name) or not menu) then
+                    for name, drawing in next, drawings do
+                        if(name == "chams") then
+                            for _, chams in next, drawing do
+                                for _, cham in next, chams do
+                                    cham.Parent = nil
+                                    cham.Adornee = nil
+                                end
+                            end
+                        elseif(name == "bones") then
+                            for _, bone in next, drawing do
+                                bone.Visible = false
+                            end
+                        else
+                            if(type(drawing) == "Drawing") then
+                                drawing.Visible = false
+                            end
+                        end
+                    end
+
+                    client.esp[object] = nil
+                end
+            elseif(obj_type == "weapon") then
+                if(not workspace.Ignore.GunDrop:FindFirstChild(object) or not menu) then
+                    for name, drawing in next, drawings do
+                        if(type(drawing) == "Drawing") then
+                            drawing.Visible = false
+                        end
+                    end
+
+                    client.esp[object] = nil
+                end
+            end
+        end
+
+        if(not menu) then
+            loops:UnbindFromRenderStep("Esp")
+            return 
+        end
+
+        for _, player in next, players:GetPlayers() do
+            local team = player.Team == local_plr.Team and "team" or "enemie"
+            local char = client.get_char(player)
+            local alive = client.is_alive(player)
+            local _, on_screen
+            
+            if(menu.flags[team .. "_enabled"] and char) then
+                _, on_screen = local_cam:WorldToViewportPoint(char.Torso.Position)
+            end
+
+            if(not client.char.alive or not on_screen or not alive or local_plr == player) then
+                if(not client.esp[player]) then
+                    continue
+                end
+
+                for name, drawing in next, client.esp[player] do
+                    if(name == "chams") then
+                        for _, chams in next, drawing do
+                            for _, cham in next, chams do
+                                cham.Parent = nil
+                                cham.Adornee = nil
+                            end
+                        end
+                    elseif(name == "bones") then
+                        for _, bone in next, drawing do
+                            bone.Visible = false
+                        end
+                    else
+                        if(type(drawing) == "Drawing") then
+                            drawing.Visible = false
+                        end
+                    end
+                end
+                
+                continue
+            end
+
+            if(not client.esp[player]) then
+                local object = {type = "player"}
+
+                object["name"] = draw("Text", {
+                    Visible = false,
+                    Transparency = 1,
+                    Color = menu.flags[team .. "_name_color"],
+                    Text = "",
+                    Size = 0, -- menu.flags["text_size"],
+                    Center = true,
+                    Outline = true,
+                    OutlineColor = Color3.new(),
+                    Position = Vector2.new(),
+                    Font = fonts[menu.flags["text_font"]]
+                })
+
+                object["weapon"] = draw("Text", {
+                    Visible = false,
+                    Transparency = 1,
+                    Color = menu.flags[team .. "_weapon_color"],
+                    Text = "",
+                    Size = 0, -- menu.flags["text_size"],
+                    Center = true,
+                    Outline = true,
+                    OutlineColor = Color3.new(),
+                    Position = Vector2.new(),
+                    Font = fonts[menu.flags["text_font"]]
+                })
+
+                object["box_outline"] = draw("Square", {
+                    Visible = false,
+                    Transparency = 1,
+                    Color = Color3.fromRGB(0, 0, 0),
+                    Thickness = 3,
+                    Size = Vector2.new(),
+                    Position = Vector2.new(),
+                    Filled = false
+                })
+
+                object["box"] = draw("Square", {
+                    Visible = false,
+                    Transparency = 1,
+                    Color = menu.flags[team .. "_box_color"],
+                    Thickness = 1,
+                    Size = Vector2.new(),
+                    Position = Vector2.new(),
+                    Filled = false
+                }) 
+
+                object["health_outline"] = draw("Square", {
+                    Visible = false,
+                    Transparency = 1,
+                    Color = Color3.fromRGB(0, 0, 0),
+                    Thickness = 3,
+                    Size = Vector2.new(),
+                    Position = Vector2.new(),
+                    Filled = false
+                })
+
+                object["health"] = draw("Square", {
+                    Visible = false,
+                    Transparency = 1,
+                    Color = Color3.fromRGB(0, 255, 0),
+                    Thickness = 1,
+                    Size = Vector2.new(),
+                    Position = Vector2.new(),
+                    Filled = false
+                })
+
+                object["health_text"] = draw("Text", {
+                    Visible = false,
+                    Transparency = 1,
+                    Color = Color3.fromRGB(255, 255, 255),
+                    Text = "",
+                    Size = 0, -- menu.flags["text_size"],
+                    Center = true,
+                    Outline = true,
+                    OutlineColor = Color3.new(),
+                    Position = Vector2.new(),
+                    Font = fonts[menu.flags["text_font"]]
+                })
+
+                object["chams"] = {} do
+                    for i = 1, #bones[rig_type] do
+                        object["chams"][i] = bones[rig_type][i] == "Head" and {
+                            create("CylinderHandleAdornment", {
+                                ZIndex = 1  
+                            }), 
+                            create("CylinderHandleAdornment", {
+                                ZIndex = 1  
+                            })
+                        } or {
+                            create("BoxHandleAdornment", {
+                                ZIndex = 1  
+                            }), 
+                            create("BoxHandleAdornment", {
+                                ZIndex = 1  
+                            })
+                        }
+                    end
+                end
+
+                object["bones"] = {} do
+                    for i = 1, #bone_format[rig_type] do
+                        object["bones"][i] = draw("Line", {
+                            Visible = false,
+                            Transparency = 1,
+                            Color = menu.flags[team .. "_skeleton_color"],
+                            Thickness = 1,
+                            From = Vector2.new(),
+                            To = Vector2.new()
+                        })
+                    end
+                end
+
+                client.esp[player] = object
+            end
+
+            local torso_cframe = char.Torso.CFrame
+            local matrix_top = torso_cframe.Position + (torso_cframe.UpVector * 1.5) + local_cam.CFrame.UpVector
+            local matrix_bottom = torso_cframe.Position - (torso_cframe.UpVector * 3)
+
+            local top, top_is_visible = local_cam:WorldToViewportPoint(matrix_top)
+            local bottom, bottom_is_visible = local_cam:WorldToViewportPoint(matrix_bottom)
+
+            if(not top_is_visible and not bottom_is_visible) then 
+                continue 
+            end
+
+            local width = math.floor(math.abs(top.X - bottom.X))
+            local height = math.floor(math.max(math.abs(bottom.Y - top.Y), width * 0.6))
+            local distance_scale = (local_cam.CFrame.Position - torso_cframe.Position).Magnitude
+
+            local base_size = Vector2.new(math.floor(math.max(height / 1.7, width * 1.8)), height)
+            local base_position = Vector2.new(math.floor(top.X * 0.5 + bottom.X * 0.5 - base_size.X * 0.5), math.floor(math.min(top.Y, bottom.Y)))
+            local text_size = menu.flags["scale_text_size"] and math.clamp(1 / distance_scale * 1000, 1, 13) or menu.flags["text_size"] -- 600 = change point (lower = closer = max size)
+
+            local object = client.esp[player]
+
+            if(menu.flags[team .. "_name"]) then
+                local new_name = player.Name:sub(1, 1):upper() .. player.Name:sub(2, player.Name:len())
+
+                client.text_bounds.Font = fonts[menu.flags["text_font"]]
+                client.text_bounds.Size = text_size -- menu.flags["text_size"]
+                client.text_bounds.Text = new_name:sub(1, menu.flags["text_length"])
+
+                object["name"].Visible = true
+                object["name"].Text = new_name:sub(1, menu.flags["text_length"])
+                object["name"].Size = text_size -- menu.flags["text_size"]
+                object["name"].Font = fonts[menu.flags["text_font"]]
+                object["name"].Color = menu.flags[team .. "_name_color"]
+                object["name"].Position = Vector2.new(base_position.X + base_size.X / 2, base_position.Y - (client.text_bounds.TextBounds.Y + 3))
+            else
+                object["name"].Visible = false
+            end
+
+            if(menu.flags[team .. "_weapon"]) then
+                client.text_bounds.Font = fonts[menu.flags["text_font"]]
+                client.text_bounds.Size = text_size -- menu.flags["text_size"]
+                client.text_bounds.Text = "KNIFE"
+
+                object["weapon"].Visible = true
+                object["weapon"].Text = "KNIFE"
+                object["weapon"].Size = text_size -- menu.flags["text_size"]
+                object["weapon"].Font = fonts[menu.flags["text_font"]]
+                object["weapon"].Color = menu.flags[team .. "_weapon_color"]
+                object["weapon"].Position = Vector2.new(base_position.X + base_size.X / 2, (base_position.Y + base_size.Y) + ((client.text_bounds.TextBounds.Y / 2) - 3))
+            else
+                object["weapon"].Visible = false
+            end
+
+            if(menu.flags[team .. "_box"]) then
+                object["box_outline"].Visible = true
+                object["box_outline"].Size = Vector2.new(base_size.X, base_size.Y)
+                object["box_outline"].Position = Vector2.new(base_position.X, base_position.Y)
+                
+                object["box"].Visible = true
+                object["box"].Size = Vector2.new(base_size.X, base_size.Y)
+                object["box"].Color = menu.flags[team .. "_box_color"]
+                object["box"].Position = Vector2.new(base_position.X, base_position.Y)
+            else
+                object["box_outline"].Visible = false
+                object["box"].Visible = false
+            end
+
+            if(menu.flags[team .. "_health_bar"]) then
+                local health = math.ceil(client.hud:getplayerhealth(player))
+
+                object["health_outline"].Visible = true
+                object["health_outline"].Size = Vector2.new(1, base_size.Y + 3)
+                object["health_outline"].Position = Vector2.new(base_position.X - 4, base_position.Y - 1)
+
+                object["health"].Visible = true
+                object["health"].Size = Vector2.new(1, (base_size.Y + 1) * (health / 100))
+                object["health"].Color = menu.flags[team .. "_health_bar_custom"] and menu.flags[team .. "_health_bar_color"] or Color3.new(-(health / 100) + 1, health / 100, 0)
+                object["health"].Position = Vector2.new(base_position.X - 4, base_position.Y - ((base_size.Y) * (health / 100) - base_size.Y))
+
+                if(health < 100) then
+                    client.text_bounds.Text = tostring(health)
+
+                    object["health_text"].Visible = true
+                    object["health_text"].Text = tostring(health)
+                    object["health_text"].Size = text_size -- menu.flags["text_size"]
+                    object["health_text"].Font = fonts[menu.flags["text_font"]]
+                    object["health_text"].Position = Vector2.new(base_position.X - client.text_bounds.TextBounds.X, base_position.Y - ((base_size.Y) * (health / 100) - base_size.Y))
+                 else
+                    object["health_text"].Visible = false
+                 end
+            else
+                object["health"].Visible = false
+                object["health_text"].Visible = false
+                object["health_outline"].Visible = false
+            end
+
+            if(menu.flags[team .. "_chams"]) then
+                for i = 1, #bones[rig_type] do
+                    local bone_name = bones[rig_type][i]
+                    local bone = char[bone_name]
+                    local chams = object["chams"][i]
+
+                    if(bone_name == "Head") then
+                        chams[1].Height = bone.Size.Y + 0.5
+                        chams[1].Radius = bone.Size.X / 2 + 0.2
+                        chams[1].CFrame = CFrame.new(Vector3.new(0, 0.2, 0), Vector3.new(0,1,0))
+
+                        chams[2].Height = bone.Size.Y + 0.3
+                        chams[2].Radius = bone.Size.X / 2 + 0.1
+                        chams[2].CFrame = CFrame.new(Vector3.new(0, 0.2, 0), Vector3.new(0,1,0))
+                    else
+                        chams[1].Size = bone.Size + Vector3.new(0.3, 0.3, 0.3)
+                        chams[2].Size = bone.Size + Vector3.new(0.1, 0.1, 0.1)
+                    end
+
+                    chams[1].Parent = bone
+                    chams[1].Adornee = bone
+                    chams[1].AlwaysOnTop = false
+                    chams[1].Color3 = menu.flags[team .. "_chams_vis_color"]
+                    chams[1].Transparency = 1 - menu.flags[team .. "_chams_vis_color_alpha"]
+
+                    chams[2].Parent = bone
+                    chams[2].Adornee = bone
+                    chams[2].AlwaysOnTop = true
+                    chams[2].Color3 = menu.flags[team .. "_chams_color"]
+                    chams[2].Transparency = 1 - menu.flags[team .. "_chams_color_alpha"]
+                end
+            else
+                for _, chams in next, object["chams"] do
+                    for _, cham in next, chams do
+                        cham.Parent = nil
+                        cham.Adornee = nil
+                    end
+                end
+            end
+
+            if(menu.flags[team .. "_skeleton"]) then
+                for i = 1, #bone_format[rig_type] do
+                    local from_bone = bone_format[rig_type][i].From
+                    local from_pos = local_cam:WorldToViewportPoint((from_bone == "Neck" or from_bone == "Pelvis") and (from_bone == "Neck" and (char.Torso.CFrame * CFrame.new(0, 0.8, 0)).Position or (char.Torso.CFrame * CFrame.new(0, -1, 0)).Position) or char[from_bone].Position)
+
+                    local to_bone = bone_format[rig_type][i].To
+                    local to_pos = local_cam:WorldToViewportPoint((to_bone == "Neck" or to_bone == "Pelvis") and (to_bone == "Neck" and (char.Torso.CFrame * CFrame.new(0, 0.8, 0)).Position or (char.Torso.CFrame * CFrame.new(0, -1, 0)).Position) or char[to_bone].Position)
+
+                    object["bones"][i].Visible = true
+                    object["bones"][i].Color = menu.flags[team .. "_skeleton_color"]
+                    object["bones"][i].From = Vector2.new(from_pos.X, from_pos.Y)
+                    object["bones"][i].To = Vector2.new(to_pos.X, to_pos.Y)
+                end
+            else
+                for _, bone in next, object["bones"] do
+                    bone.Visible = false
+                end
+            end
+        end
+
+        for _, weapon in next, workspace.Ignore.GunDrop:GetChildren() do
+            local _, on_screen
+
+            if(menu.flags["weapon_names"] and weapon:FindFirstChild("OtherNode")) then
+                pos, on_screen = local_cam:WorldToViewportPoint(weapon.OtherNode.Position)
+            end
+
+            if(not on_screen) then
+                if(not client.esp[weapon]) then
+                    continue
+                end
+
+                for _, drawing in next, client.esp[weapon] do
+                    drawing.Visible = false
+                end
+
+                continue
+            end
+
+            if(not client.esp[weapon]) then
+                local object = {type = "weapon"}
+
+                object["text"] = draw("Text", {
+                    Visible = false,
+                    Transparency = 1,
+                    Color = Color3.fromRGB(255, 255, 255),
+                    Text = "",
+                    Size = 0, -- menu.flags["text_size"],
+                    Center = true,
+                    Outline = true,
+                    OutlineColor = Color3.new(),
+                    Position = Vector2.new(),
+                    Font = fonts[menu.flags["text_font"]]
+                })
+
+                client.esp[weapon] = object
+            end
+
+            local object = client.esp[weapon]
+
+            object["text"].Visible = true
+            object["text"].Position = Vector2.new(pos.X, pos.Y)
+            object["text"].Text = weapon.Gun.Value .. "\n[" .. tostring(--[[weapon.Spare.Value]] math.floor(pos.Z)) .. "]" -- pos from camera
+            object["text"].Size = 13 -- menu.flags["text_size"]
+            object["text"].Font = fonts[menu.flags["text_font"]]
+        end
+    end)
+
+    -- other hooks
+    local last_weapon = client.logic.currentgun and client.logic.currentgun.gunnumber or 1
+    client.network.send = function(self, event, ...)
+        if(not menu) then
+            client.network.send = old_send
+            return old_send(self, event, ...)
+        end
+
+        local args = {...}
+
+        if(event == "debug" or event == "logmessage") then
+            return menu:Notification(event .. ": " .. tostring(args[1]))
+        end
+
+        if(event == "falldamage" and (menu.flags["bypass_fall_damage"])) then
+            return
+        end
+        
+        if(event == "bullethit" and menu.flags["spoof_hitpart"]) then
+            -- args[3] = menu.flags["spoofed_hitpart"] -- 
+            args[3] = args[3].Parent:FindFirstChild(menu.flags["spoofed_hitpart"]) or args[3]
+        end
+
+        if(event == "equip") then
+            if(last_weapon and last_weapon ~= 3 and args[1] ~= 3) then
+                last_shot = 0
+                xpcall(apply_gun_modifications, print)
+            end
+
+            last_weapon = args[1]
+        end
+
+        if(event == "stance" and menu.flags["anti_aim_enabled"]) then
+            args[1] = string.lower(menu.flags["anti_aim_stance"])
+        end
+
+        if(event == "bullethit" and menu.flags["custom_hit_sound"]) then
+            coroutine.wrap(function()
+                create("Sound", {Parent = workspace, SoundId = "rbxassetid://" .. tostring(sounds[menu.flags["hit_sound"]]), PlayOnRemove = true, Volume = 5}):Destroy()
+            end)()
+        end
+
+        if(event == "ping") then -- our ratelimited loop
+            if(menu.flags["auto_vote"]) then
+                client.hud:vote(string.lower(menu.flags["auto_vote_option"]))
+            end
+
+            if((menu.flags["kill_say"] or menu.flags["death_say"]) and #client.chat_queue > 0) then
+                client.network:send("chatted", table.remove(client.chat_queue, 1))
+            elseif(menu.flags["chat_spam"]) then
+                client.network:send("chatted", messages.spam[math.random(1, #messages.spam)]  .. " " .. math.random(1, 100))
+            end
+        end
+
+        if(event == "spawn") then
+            coroutine.wrap(function()
+                repeat wait() until client.char.alive and local_plr.Character
+                -- local updater = client.replication.getupdater(local_plr)
+
+                if(updater) then
+                    -- updater.updatecharacter(local_plr.Character)
+                end
+
+                last_weapon = 1
+
+                if(menu.flags["fake_lag"]) then
+                    local root = local_plr.Character:WaitForChild("HumanoidRootPart")
+                    local torso = local_plr.Character:WaitForChild("Torso")
+
+                    root.Parent = nil
+                    torso.Position += Vector3.new(0, 1, 0)
+                    root.Parent = local_plr.Character
+                    root:WaitForChild("RootJoint").Part1 = nil
+                    
+                    coroutine.wrap(function()
+                        repeat wait() until not client.char.alive or (torso and (torso.CFrame.Position - root.CFrame.Position).Magnitude > 21)
+
+                        root.RootJoint.Part1 = torso -- fix collisions?
+                        print("fixed collisions")
+                    end)()
+
+                    print("we fake bb")
+
+                    coroutine.wrap(function()
+                        client.server_pos = root.CFrame
+
+                        local server_pos = root.Position
+                        local server_drawing = draw("Text", {
+                            Font = 2,
+                            Text = "Server Position",
+                            Size = 13,
+                            Center = true,
+                            Outline = true,
+                            Visible = false,
+                            Transparency = 1,
+                            Position = Vector2.new(),
+                            OutlineColor = Color3.new(),
+                            Color = Color3.fromRGB(255, 255, 255),
+                        })
+
+                        while(client.char.alive and local_plr.Character and wait()) do
+                            if(not local_plr.Character:FindFirstChild("HumanoidRootPart") or not local_plr.Character:FindFirstChild("Torso")) then
+                                break
+                            end
+
+                            if((server_pos - root.CFrame.Position).Magnitude > 19.9) then
+                                client.server_pos = root.CFrame
+                                server_pos = root.Position
+                            end
+
+                            local pos, on_screen = local_cam:WorldToViewportPoint(server_pos)
+
+                            if(on_screen) then
+                                local distance = (root.Position - server_pos).magnitude
+
+                                server_drawing.Visible = true
+                                server_drawing.Position = Vector2.new(pos.X, pos.Y)
+                                server_drawing.Text = "Server Position\n[" .. tostring(distance) .. "]\n [" .. string.upper(tostring(distance > 19)) .. "]"
+                                server_drawing.Color = Color3.new(-((20 - distance) / 20) + 1, (20 - distance) / 20, 0)
+                            else
+                                server_drawing.Visible = false
+                            end
+                        end
+
+                        server_drawing.Visible = false
+                    end)()
+                end
+            end)()
+        end
+
+        if(event == "newbullets") then
+            coroutine.wrap(function()
+                if(not client.logic.currentgun or (client.logic.currentgun and client.logic.currentgun.type == "KNIFE")) then
+                    return
+                end
+
+                local gun = client.logic.currentgun
+                local cam_pos = local_cam.CFrame.Position
+                local origin = gun.barrel.Position
+                
+                for _, bullet in next, args[1].bullets do
+                    local tracer_trajectory
+                    local bullet_trajectory = bullet[1]
+                    local hit_pos = cam_pos + bullet_trajectory
+                    local penatrated = 0
+
+                    local forward_ray = Ray.new(cam_pos, hit_pos - cam_pos)
+                    local backward_ray = Ray.new(hit_pos, cam_pos - hit_pos)
+
+                    local parts_hit = {}
+                    local test
+
+                    -- GetPartsObscuringTarget slow?
+                    for _, hit_part in next, local_cam:GetPartsObscuringTarget({hit_pos}, {workspace.Players, workspace.Ignore, workspace.Terrain, local_cam}) do
+                        if hit_part.Transparency < 1 and hit_part.CanCollide and hit_part.Name ~= "killbullet" then
+                            if(menu.flags["bullet_impacts"] and penatrated >= gun.data.penetrationdepth) then
+                                local wall, hit_point = workspace:FindPartOnRayWithIgnoreList(Ray.new(test or origin, bullet_trajectory), {workspace.Players, workspace.Ignore, workspace.Terrain, local_cam, unpack(parts_hit)})
+                            
+                                if(wall) then
+                                    local impact_part = create("Part", {
+                                        Parent = workspace.Ignore,
+                                        Size = Vector3.new(0.45, 0.45, 0.45),
+                                        Position = hit_point,
+                                        CanCollide = false,
+                                        Anchored = true,
+                                        Material = "Plastic", 
+                                        Transparency = 1 - menu.flags["bullet_impact_color_alpha"], 
+                                        Color = menu.flags["bullet_impact_color"]
+                                    })
+                            
+                                    delay(1, function()
+                                        impact_part:Destroy()
+                                    end)
+                                end
+                            
+                                table.insert(parts_hit, wall)
+                            end
+
+                            if(hit_part.Name ~= "Window") then
+                                local _, entry_point = workspace:FindPartOnRayWithWhitelist(forward_ray, {hit_part})
+                                local _, exit_point = workspace:FindPartOnRayWithWhitelist(backward_ray, {hit_part})
+
+                                penatrated = penatrated + (exit_point - entry_point).Magnitude
+                                if(penatrated >= gun.data.penetrationdepth) then
+                                    tracer_trajectory = bullet_trajectory.Unit * (entry_point - origin).Magnitude
+                                end
+                            end
+                        end
+                    end
+
+                    -- no walls in the way
+                    if(not tracer_trajectory) then
+                        tracer_trajectory = bullet_trajectory
+                    end
+
+                    -- trace trajectory
+                    if(menu.flags["bullet_tracers"]) then
+                        -- time to reach target
+                        local time = tracer_trajectory.Magnitude / gun.data.bulletspeed * tracer_trajectory.Unit:Dot(tracer_trajectory.Unit)
+    
+                        local tracer_part = create("Part", {
+                            Parent = workspace.Ignore,
+                            Size = Vector3.new(0.10, 0.10, 0.10),
+                            CFrame = CFrame.new(origin, origin + tracer_trajectory.Unit),
+                            CanCollide = false,
+                            Anchored = true,
+                            Material = "Plastic",
+                            Transparency = 1- menu.flags["bullet_tracer_color_alpha"], 
+                            Color = menu.flags["bullet_tracer_color"]
+                        })
+    
+                        local tween = anim:Create(tracer_part, TweenInfo.new(time), {
+                            Position = origin + (tracer_trajectory / 2),
+                            Size = Vector3.new(0.15, 0.15, tracer_trajectory.Magnitude)
+                        })
+                        
+                        delay(time + 1, function()
+                            tracer_part:Destroy()
+                            tween:Destroy()
+                        end)
+    
+                        tween:Play()
+                    end
+                end
+            end)()
+        end
+
+        if(event == "repupdate") then
+            if(menu.flags["godmode"]) then
+                return -- eh
+            end
+
+            --[[if(client.gay_old) then
+                args[1] = client.gay_old.p
+            else]]
+                
+            if(menu.flags["fake_lag"] and local_plr.Character and local_plr.Character:FindFirstChild("HumanoidRootPart")) then
+                args[1] = local_plr.Character.HumanoidRootPart.Position -- should fix pos bug
+            end
+
+            if(menu.flags["anti_aim_enabled"]) then
+                client.spin_angle = client.spin_angle + menu.flags["spin_speed"]
+
+                --[[if(menu.flags["anti_aim_underground"] and client.char.alive and local_plr.Character) then
+                    local_plr.Character.Humanoid.HipHeight = -menu.flags["underground_distance"]
+                end]]
+
+                local function rad(angle)
+                    return math.pi * (angle / 360)
+                end
+
+                local pn = menu.flags["anti_aim_pitch"]
+                local pitch = pn == "Down" and -90 or pn == "Up" and 90 or pn == "Zero" and 0
+
+                local yn = menu.flags["anti_aim_yaw"]
+                local yaw = menu.flags["spin_bot"] and client.spin_angle or (yn == "Forward" and -90 or yn == "Left" and 0 or yn == "Right" and 180 or yn == "Back" and 90)
+
+                -- args[1] = args[1] + Vector3.new(0, -menu.flags["underground_distance"], 0)
+                args[2] = Vector2.new(rad(pitch), rad(yaw))
+
+                --[[coroutine.wrap(function()
+                    local fake = local_plr.Character:Clone()
+
+                    for _, part in next, fake:GetChildren() do
+                        if(part:IsA("Part") and part.Name ~= "HumanoidRootPart") then
+                            part.Transparency = 0.5
+                        end
+                    end
+
+                    fake.Parent = workspace.Ignore
+                    fake:MoveTo(args[1])
+
+                    wait(1)
+
+                    fake:Destroy()
+                end)]]
+            end
+
+        
+        end
+
+        return old_send(self, event, unpack(args))
+    end
+
+    --[[client.particle.new = function(data)
+        if(not menu) then
+            client.particle.new = old_particle
+            return old_particle(data)
+        end
+
+        if(menu.flags["bullet_impacts"]) then
+            local old_ontouch = data.ontouch
+
+            data.ontouch = function(...)
+                local impact_part = create("Part", {
+                    Parent = workspace.Ignore,
+                    Size = Vector3.new(0.6, 0.6, 0.6),
+                    Position = ({...})[3],
+                    CanCollide = false,
+                    Anchored = true,
+                    Material = "ForceField", 
+                    Color = menu.flags["bullet_impacts_color"]
+                })
+        
+                delay(1, function()
+                    impact_part:Destroy()
+                end)
+
+                return old_ontouch(...)
+            end
+        end
+
+        return old_particle(data)
+    end]]
+
+    client.sound.PlaySound = function(sound, ...)
+        if(not menu) then
+            client.sound.PlaySound = old_play_sound
+            return old_play_sound(sound, ...) 
+        end
+
+        if(menu.flags["custom_hit_sound"] and sound == "hitmarker") then
+            return
+        end
+
+        return old_play_sound(sound, ...)
+    end
+
+    client.camera.setsway = function(self, value)
+        if(not menu) then
+            client.camera.setsway = old_setsway
+            return old_setsway(self, value)
+        end
+
+        return old_setsway(self, menu.flags["no_scope_sway"] and 0 or value)
+    end
+elseif(place == 321) then
+
+end
+
+menu:Render("AimHack", "bw", debug and "Dev. 1.3" or "Rel. 1.3") -- <name, cfg extention, version>
+menu:Watermark(true)                                                                                                                repeat wait() until menu.inst
+menu:Notification("Welcome, " .. local_plr.Name --[[tostring(math.floor((tick() - start_tick) * 1000)) .. "ms"]])
+
+return true
