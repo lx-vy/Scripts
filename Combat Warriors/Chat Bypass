@@ -1,0 +1,50 @@
+method = 1
+randomtable = {
+    ['uck'] = "<!--ireflies are y-->uck<!--'y and disgut'-->",
+    ['tch'] = "<!--ireflies are y-->tch<!--'y and disgut'-->",
+    ['hit'] = "<!--ireflies are y--><!--'y and disgut'-->hit",
+    ['ic'] = "<!--ireflies are y-->ic<!--'y and disgut'-->",
+    ['rnhub'] = "<!--ireflies are y-->rnhub<!--'y and disgut'-->",
+    ['tard'] = "<!--ireflies are y--><!--'y and disgut'-->tard",
+    ['orn'] = "<!--ireflies are y--><!--'y and disgut'-->orn",
+    ['ss'] = "<!--ireflies are y--><!--'y and disgut'-->ss",
+    ['x'] = "<!--ireflies are y--><!--'y and disgut'-->x",
+    ['ll'] = "<!--ireflies are y--><!--'y and disgut'-->ll",
+    ['self'] = "<!--ireflies are y--><!--'y and disgut'-->self",
+    ['UC'] = "<!--ireflies are y-->UC<!--'y and disgut'-->",
+    ['U'] = "<!--ireflies are y--><!--'y and disgut'-->U",
+    ['hu'] = "<!--ireflies are y--><!--'y and disgut'-->hu",
+    ['um'] = "<!--ireflies are y--><!--'y and disgut'-->um",
+    ['TCH'] = "<!--ireflies are y--><!--'y and disgut'-->TCH",
+    ['HIT'] = "<!--ireflies are y--><!--'y and disgut'-->HIT",
+    ['RD'] = "<!--ireflies are y-->RD<!--'y and disgut'-->"
+}
+
+
+fire = false
+game:GetService("TextChatService").OnIncomingMessage = function(L)
+    if method == 1 then
+        if L.TextSource and tonumber(L.TextSource.UserId) == game:FindService("Players").LocalPlayer.UserId then 
+            for i,v in next, randomtable do
+                L.Text =  L.Text:gsub(i,v)
+            end
+        end
+    else
+        if fire == false and L.TextSource and tonumber(L.TextSource.UserId) == game:FindService("Players").LocalPlayer.UserId then 
+            if method == 1 then
+                for i,v in next, randomtable do
+                   L.Text =  L.Text:gsub(i,v)
+                end
+            end
+            fire = true
+            message = L.Text:split('')
+            l = ''
+            for i,v in next,message do
+                l = l.."<!--o m g -->"..v
+            end
+            L.Text = l
+        elseif L.TextSource and L.TextSource.UserId == game.Players.LocalPlayer.UserId then
+            fire = false
+        end        
+    end
+end
