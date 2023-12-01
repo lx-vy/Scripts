@@ -2,7 +2,9 @@
 
 Welcome to my repo with some of my old open-source Roblox scripts.
 
-**_Note:_ Some of these scripts may already be patched, please do not use them as you may be banned!**
+## Note
+
+Some of these scripts may already be patched, please do not use them as you may be banned!
 
 ## Bio
 
