@@ -1,0 +1,31 @@
+local lplr = game.Players.LocalPlayer
+local char = lplr.Character
+local humRoot = char:FindFirstChild("HumanoidRootPart")
+local THINGS_FOLDER = workspace.__THINGS
+local orbsFolder = THINGS_FOLDER.Orbs
+local lootbagsFolder = THINGS_FOLDER.Lootbags
+local tweenService = game:GetService("TweenService")
+
+_G.EnhancedMagnet = true
+
+if _G.EnhancedMagnet == true then
+    print("EnhancedMagnet is enabled!")
+else
+    print("EnhancedMagnet is not enabled!")
+end
+
+while _G.EnhancedMagnet == true do
+    for _, orb in pairs(orbsFolder:GetChildren()) do
+        if orb:IsA("Part") then
+            tweenService:Create(orb, TweenInfo.new(.1, Enum.EasingStyle.Linear, Enum.EasingDirection.In), {CFrame = CFrame.new(humRoot.CFrame.Position)}):Play()
+        end
+    end
+
+    for _, lootbag in pairs(lootbagsFolder:GetDescendants()) do
+        if lootbag:IsA("MeshPart") then
+            tweenService:Create(lootbag, TweenInfo.new(.1, Enum.EasingStyle.Linear, Enum.EasingDirection.In), {CFrame = CFrame.new(humRoot.CFrame.Position)}):Play()
+        end
+    end
+
+    wait()
+end
